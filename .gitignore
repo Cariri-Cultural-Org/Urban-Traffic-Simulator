@@ -1,0 +1,17 @@
+# Executáveis Windows e Linux
+*.exe
+*.out
+*.app
+
+# Arquivos objeto (arquivos de compilação intermediária)
+*.o
+*.obj
+
+# Pastas de build/binários
+/bin/
+/build/
+/src/output/
+
+# Arquivos temporários e do VS Code
+.vscode/
+*.log
