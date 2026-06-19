@@ -18,7 +18,7 @@ else
 endif
 
 # Lista de arquivos C e Objetos
-SRCS = src/main.c src/models/Relogio_global.c src/models/Semaforo.c src/models/Celula.c src/models/Via.c src/models/Cruzamento.c src/models/Mapa.c
+SRCS = src/main.c src/models/Relogio_global.c src/models/Semaforo.c src/models/Celula.c src/models/Via.c src/models/Cruzamento.c src/models/Mapa.c src/models/Veiculo.c src/models/Ambulancia.c
 OBJS = $(SRCS:.c=.o)
 
 # Regra principal (a primeira a rodar se digitar apenas "make")
