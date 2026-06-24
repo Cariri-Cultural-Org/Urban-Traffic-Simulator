@@ -18,7 +18,7 @@ int main()
     init_relogio();
 
     // 2. Inicializa um semáforo de teste
-    SemaforoTransito sem1;
+    Semaforo sem1;
     // Semáforo ID 1 | 3 ticks no VERDE | 3 ticks no VERMELHO
     init_semaforo(&sem1, 1, 3, 3);
 

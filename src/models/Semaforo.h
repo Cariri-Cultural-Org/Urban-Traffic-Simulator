@@ -23,15 +23,15 @@ typedef struct
     int tempo_vermelho;
     int tick_atual;
     os_mutex_t mutex;
-} SemaforoTransito;
+} Semaforo;
 
 // Inicializa o sem�foro de tr�nsito
-void init_semaforo(SemaforoTransito *sem, int id, int t_verde, int t_vermelho);
+void init_semaforo(Semaforo *sem, int id, int t_verde, int t_vermelho);
 
 // Atualiza o estado do sem�foro a cada tick
-void atualizar_semaforo(SemaforoTransito *sem);
+void atualizar_semaforo(Semaforo *sem);
 
 // Limpa recursos do sem�foro
-void destroy_semaforo(SemaforoTransito *sem);
+void destroy_semaforo(Semaforo *sem);
 
 #endif // SEMAFORO_H

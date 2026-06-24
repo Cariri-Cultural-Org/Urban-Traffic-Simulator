@@ -1,6 +1,6 @@
 #include "Semaforo.h"
 
-void init_semaforo(SemaforoTransito *sem, int id, int t_verde, int t_vermelho)
+void init_semaforo(Semaforo *sem, int id, int t_verde, int t_vermelho)
 {
     sem->id = id;
     sem->estado = VERMELHO; // Inicia fechado por padr�o
@@ -15,7 +15,7 @@ void init_semaforo(SemaforoTransito *sem, int id, int t_verde, int t_vermelho)
 #endif
 }
 
-void atualizar_semaforo(SemaforoTransito *sem)
+void atualizar_semaforo(Semaforo *sem)
 {
 #ifdef _WIN32
     EnterCriticalSection(&sem->mutex);
@@ -44,7 +44,7 @@ void atualizar_semaforo(SemaforoTransito *sem)
 #endif
 }
 
-void destroy_semaforo(SemaforoTransito *sem)
+void destroy_semaforo(Semaforo *sem)
 {
 #ifdef _WIN32
     DeleteCriticalSection(&sem->mutex);

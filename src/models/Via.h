@@ -6,8 +6,8 @@ typedef struct Cruzamento Cruzamento ;
 
 typedef enum
 {
-    VIA_HORIZONTAL = 0,
-    VIA_VERTICAL = 1,
+    VIA_HORIZONTAL,
+    VIA_VERTICAL,
 } DirecaoVia;
 
 typedef enum
