@@ -3,17 +3,17 @@
 
 #include <stdbool.h>
 
+#include "pthread_compat.h"
+
 #ifdef _WIN32
-#include <windows.h>
 typedef CRITICAL_SECTION os_mutex_t;
 typedef HANDLE os_thread_t;
-typedef HANDLE os_cond_t; // Usado para driblar o GCC antigo do Windows
+typedef CONDITION_VARIABLE os_cond_t;
 #else
-#include <pthread.h>
 #include <unistd.h>
 typedef pthread_mutex_t os_mutex_t;
 typedef pthread_t os_thread_t;
-typedef pthread_cond_t os_cond_t; // <-- A Variavel de Condicao para Linux/SO!
+typedef pthread_cond_t os_cond_t;
 #endif
 
 // Variaveis globais para o relogio e controle de concorrencia
@@ -34,6 +34,9 @@ void *thread_global_clock(void *arg);
 
 // Funcao para uma thread aguardar ate o proximo tick
 void wait_next_tick(int current_tick);
+
+// Solicita encerramento e acorda qualquer thread bloqueada no relogio
+void stop_global_clock(void);
 
 // Limpa recursos do relogio
 void destroy_global_clock(void);

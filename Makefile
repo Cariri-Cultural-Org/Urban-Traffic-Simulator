@@ -6,7 +6,7 @@ CFLAGS = -Wall -Wextra -g3 -D_WIN32_WINNT=0x0600
 ifeq ($(OS),Windows_NT)
 	# Configurações para Windows
 	TARGET = bin/traffic-simulator.exe
-	LDFLAGS = -pthread
+	LDFLAGS =
 	MKDIR_CMD = if not exist bin mkdir bin
 	CLEAN_CMD = del /Q /S bin\* src\*.o src\models\*.o 2>nul || exit 0
 else

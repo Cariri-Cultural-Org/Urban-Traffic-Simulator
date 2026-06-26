@@ -1,7 +1,7 @@
 #ifndef VEHICLE_THREAD_H
 #define VEHICLE_THREAD_H
 
-#include <pthread.h>
+#include "models/pthread_compat.h"
 
 #include "models/CityMap.h"
 

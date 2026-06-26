@@ -1,7 +1,7 @@
 #ifndef CELL_H
 #define CELL_H
 
-#include <pthread.h>
+#include "pthread_compat.h"
 
 // Forward declaration de Vehicle.
 struct Vehicle;

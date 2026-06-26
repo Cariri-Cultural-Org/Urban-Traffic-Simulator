@@ -1,7 +1,7 @@
 #ifndef VEHICLE_H
 #define VEHICLE_H
 
-#include <pthread.h>
+#include "pthread_compat.h"
 
 #include "Road.h"
 

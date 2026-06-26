@@ -1,7 +1,8 @@
 
 #ifndef INTERSECTION_H
 #define INTERSECTION_H
-#include <pthread.h>
+
+#include "pthread_compat.h"
 #include "Road.h"
 #include "TrafficLight.h"
 

@@ -11,6 +11,31 @@
 #include <unistd.h>
 #endif
 
+#ifdef _WIN32
+static DWORD WINAPI clock_test_thread(LPVOID arg)
+#else
+static void *clock_test_thread(void *arg)
+#endif
+{
+    (void)arg;
+
+    int observed_tick = global_tick;
+
+    while (simulation_running)
+    {
+        wait_next_tick(observed_tick);
+
+        if (!simulation_running)
+            break;
+
+        observed_tick = global_tick;
+        printf("[Test] aguardou tick %d e seguiu vivo\n", observed_tick);
+    }
+
+    printf("[Test] encerrando junto com o relogio global\n");
+    return 0;
+}
+
 int main(void)
 {
     printf("--- Starting the Urban Traffic Simulator ---\n");
@@ -39,6 +64,14 @@ int main(void)
     pthread_create(&clock_thread, NULL, thread_global_clock, NULL);
 #endif
 
+    /* Thread de teste para validar espera e encerramento limpo */
+    os_thread_t test_thread;
+#ifdef _WIN32
+    test_thread = CreateThread(NULL, 0, clock_test_thread, NULL, 0, NULL);
+#else
+    pthread_create(&test_thread, NULL, clock_test_thread, NULL);
+#endif
+
     /* ── Loop de simulação (5 ticks de demonstração) ────────────────────── */
     for (int i = 1; i <= 5; i++)
     {
@@ -52,12 +85,15 @@ int main(void)
     printf("\nEncerrando simulação...\n");
 
     /* ── Finaliza o relógio ─────────────────────────────────────────────── */
-    simulation_running = false;
+    stop_global_clock();
 
 #ifdef _WIN32
+    WaitForSingleObject(test_thread, INFINITE);
+    CloseHandle(test_thread);
     WaitForSingleObject(clock_thread, INFINITE);
     CloseHandle(clock_thread);
 #else
+    pthread_join(test_thread, NULL);
     pthread_join(clock_thread, NULL);
 #endif
 

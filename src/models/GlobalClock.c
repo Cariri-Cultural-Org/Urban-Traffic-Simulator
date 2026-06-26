@@ -76,6 +76,21 @@ void wait_next_tick(int current_tick)
 #endif
 }
 
+void stop_global_clock(void)
+{
+#ifdef _WIN32
+    EnterCriticalSection(&clock_mutex);
+    simulation_running = false;
+    LeaveCriticalSection(&clock_mutex);
+    SetEvent(clock_cond);
+#else
+    pthread_mutex_lock(&clock_mutex);
+    simulation_running = false;
+    pthread_cond_broadcast(&clock_cond);
+    pthread_mutex_unlock(&clock_mutex);
+#endif
+}
+
 void destroy_global_clock(void)
 {
 #ifdef _WIN32
