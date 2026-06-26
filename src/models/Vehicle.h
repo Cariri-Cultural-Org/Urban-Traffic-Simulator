@@ -41,6 +41,7 @@ void vehicle_init(
     int road_cell_index,
     void *city_map
 );
+int vehicle_place_on_road(Vehicle *vehicle, Road *road, int road_cell_index);
 void vehicle_set_route(Vehicle *vehicle, Road **route, int route_length);
 
 #endif /* VEHICLE_H */

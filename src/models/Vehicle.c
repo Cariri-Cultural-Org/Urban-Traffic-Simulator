@@ -12,6 +12,24 @@ static VehicleDirection default_direction_for_road(const Road *road)
                : VEHICLE_DIRECTION_DOWN;
 }
 
+static void vehicle_apply_road_position(Vehicle *vehicle, Road *road, int road_cell_index)
+{
+    Cell *cell = road_get_cell(road, road_cell_index);
+
+    vehicle->current_road = road;
+    vehicle->road_cell_index = road_cell_index;
+    vehicle->row = cell->row;
+    vehicle->column = cell->column;
+    vehicle->direction = default_direction_for_road(road);
+
+    if (vehicle->route_length == 0)
+    {
+        vehicle->route[0] = road;
+        vehicle->route_length = 1;
+        vehicle->route_index = 0;
+    }
+}
+
 void vehicle_init(
     Vehicle *vehicle,
     int id,
@@ -21,21 +39,29 @@ void vehicle_init(
     void *city_map
 )
 {
-    Cell *cell = road_get_cell(road, road_cell_index);
-
     memset(vehicle, 0, sizeof(Vehicle));
     vehicle->id = id;
     vehicle->velocity = velocity;
-    vehicle->current_road = road;
-    vehicle->road_cell_index = road_cell_index;
-    vehicle->row = cell ? cell->row : 0;
-    vehicle->column = cell ? cell->column : 0;
-    vehicle->direction = default_direction_for_road(road);
-    vehicle->route[0] = road;
-    vehicle->route_length = road ? 1 : 0;
-    vehicle->route_index = 0;
     vehicle->active = 1;
     vehicle->city_map = city_map;
+
+    if (road_get_cell(road, road_cell_index))
+        vehicle_apply_road_position(vehicle, road, road_cell_index);
+}
+
+int vehicle_place_on_road(Vehicle *vehicle, Road *road, int road_cell_index)
+{
+    Cell *cell = road_get_cell(road, road_cell_index);
+
+    if (!vehicle || !cell)
+        return 0;
+
+    if (!cell_try_occupy(cell, vehicle))
+        return 0;
+
+    vehicle_apply_road_position(vehicle, road, road_cell_index);
+    vehicle->active = 1;
+    return 1;
 }
 
 void vehicle_set_route(Vehicle *vehicle, Road **route, int route_length)
