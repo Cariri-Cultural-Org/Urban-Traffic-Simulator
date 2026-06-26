@@ -1,0 +1,13 @@
+#ifndef ASCII_ELEMENTS_H
+#define ASCII_ELEMENTS_H
+
+#define ASCII_EMPTY ' '
+#define ASCII_HORIZONTAL_ROAD '-'
+#define ASCII_VERTICAL_ROAD '|'
+#define ASCII_INTERSECTION '+'
+#define ASCII_GREEN_HORIZONTAL 'H'
+#define ASCII_GREEN_VERTICAL 'V'
+#define ASCII_CAR 'C'
+#define ASCII_AMBULANCE 'A'
+
+#endif

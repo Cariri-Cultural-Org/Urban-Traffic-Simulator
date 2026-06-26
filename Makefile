@@ -1,42 +1,37 @@
-# Compilador e Flags
 CC = gcc
-CFLAGS = -Wall -Wextra -g3 -D_WIN32_WINNT=0x0600
+CFLAGS = -Wall -Wextra -Wpedantic -g3
+LDFLAGS = -pthread
+TARGET = bin/traffic-simulator
 
-# Detecta o sistema operacional para definir regras específicas
-ifeq ($(OS),Windows_NT)
-	# Configurações para Windows
-	TARGET = bin/simulador.exe
-	LDFLAGS = 
-	MKDIR_CMD = if not exist bin mkdir bin
-	CLEAN_CMD = del /Q /S bin\* src\*.o 2>nul || exit 0
-else
-	# Configurações para Linux/Mac
-	TARGET = bin/simulador
-	LDFLAGS = -lpthread
-	MKDIR_CMD = mkdir -p bin
-	CLEAN_CMD = rm -rf bin/* src/*.o
-endif
+SRCS = \
+	src/main.c \
+	src/models/GlobalClock.c \
+	src/models/TrafficLight.c \
+	src/models/Cell.c \
+	src/models/Road.c \
+	src/models/Intersection.c \
+	src/models/CityMap.c \
+	src/models/Vehicle.c \
+	src/models/Ambulance.c
 
-# Lista de arquivos C e Objetos
-SRCS = src/main.c src/models/Relogio_global.c src/models/Semaforo.c src/models/Celula.c src/models/Via.c src/models/Cruzamento.c src/models/Mapa.c src/models/Veiculo.c src/models/Ambulancia.c
 OBJS = $(SRCS:.c=.o)
 
-# Regra principal (a primeira a rodar se digitar apenas "make")
+.PHONY: all clean run
+
 all: build_dir $(TARGET)
 
-# Cria a pasta bin se não existir
 build_dir:
-	@$(MKDIR_CMD)
+	@mkdir -p bin
 
-# Linka os arquivos objeto gerando o executável na pasta bin
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
 
-# Compila arquivos .c em .o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Regra para limpar a compilação (arquivos temporários gerados)
+run: all
+	./$(TARGET)
+
 clean:
-	@$(CLEAN_CMD)
-	@echo "Limpeza concluida."
+	@rm -rf bin/* src/*.o src/models/*.o
+	@echo "Build files removed."
