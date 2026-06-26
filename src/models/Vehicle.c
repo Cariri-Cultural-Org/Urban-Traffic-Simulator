@@ -20,8 +20,8 @@ static int vehicle_occupy_start(Vehicle *vehicle)
 
     if (occupied)
     {
-        vehicle->row = cell->row;
-        vehicle->col = cell->col;
+        vehicle->position.row = cell->row;
+        vehicle->position.col = cell->col;
     }
 
     pthread_mutex_unlock(&city->state_mutex);
@@ -41,39 +41,156 @@ static void vehicle_release_current_cell(Vehicle *vehicle)
     pthread_mutex_unlock(&city->state_mutex);
 }
 
-static int vehicle_should_turn(const Vehicle *vehicle, int tick)
+static VehicleDirection vehicle_forward_direction_for_road(const Road *road)
 {
-    if (vehicle->is_ambulance)
-        return ((tick + vehicle->id) % 3) == 0;
+    if (!road)
+        return VEHICLE_DIRECTION_RIGHT;
 
-    return ((tick + vehicle->id) % 5) == 0;
+    return (road->orientation == ROAD_HORIZONTAL)
+               ? VEHICLE_DIRECTION_RIGHT
+               : VEHICLE_DIRECTION_DOWN;
 }
 
-static void vehicle_turn_if_needed(Vehicle *vehicle, Intersection *intersection, int tick)
+static void vehicle_set_direction_from_road(Vehicle *vehicle)
 {
-    if (!intersection || !vehicle_should_turn(vehicle, tick))
+    if (!vehicle || !vehicle->current_road)
         return;
 
-    Road *next_road = (vehicle->current_road->orientation == ROAD_HORIZONTAL)
-                          ? intersection->vertical_road
-                          : intersection->horizontal_road;
+    if (vehicle->current_road->orientation == ROAD_HORIZONTAL)
+    {
+        vehicle->direction = (vehicle->current_road->type == ROAD_ONE_WAY)
+                                 ? vehicle_forward_direction_for_road(vehicle->current_road)
+                                 : ((vehicle->current_road->id % 2 == 0)
+                                        ? VEHICLE_DIRECTION_RIGHT
+                                        : VEHICLE_DIRECTION_LEFT);
+    }
+    else
+    {
+        vehicle->direction = (vehicle->current_road->type == ROAD_ONE_WAY)
+                                 ? vehicle_forward_direction_for_road(vehicle->current_road)
+                                 : ((vehicle->current_road->id % 2 == 0)
+                                        ? VEHICLE_DIRECTION_DOWN
+                                        : VEHICLE_DIRECTION_UP);
+    }
+}
 
-    if (!next_road)
+static void vehicle_update_position(Vehicle *vehicle, Cell *cell)
+{
+    if (!vehicle || !cell)
+        return;
+
+    vehicle->position.row = cell->row;
+    vehicle->position.col = cell->col;
+}
+
+static int vehicle_next_index(const Vehicle *vehicle, int current_index, int *next_index)
+{
+    if (!vehicle || !next_index)
+        return 0;
+
+    switch (vehicle->direction)
+    {
+    case VEHICLE_DIRECTION_RIGHT:
+    case VEHICLE_DIRECTION_DOWN:
+        *next_index = current_index + 1;
+        break;
+    case VEHICLE_DIRECTION_LEFT:
+    case VEHICLE_DIRECTION_UP:
+        *next_index = current_index - 1;
+        break;
+    default:
+        return 0;
+    }
+
+    return 1;
+}
+
+static int vehicle_route_contains_road(const Vehicle *vehicle, Road *road)
+{
+    if (!vehicle || !road)
+        return -1;
+
+    for (int i = 0; i < vehicle->route_length; i++)
+    {
+        if (vehicle->route[i] == road)
+            return i;
+    }
+
+    return -1;
+}
+
+static int vehicle_roads_meet_at_intersection(
+    const Intersection *intersection,
+    const Road *current_road,
+    const Road *next_road
+)
+{
+    if (!intersection || !current_road || !next_road || current_road == next_road)
+        return 0;
+
+    if (current_road->orientation == ROAD_HORIZONTAL)
+    {
+        return intersection->horizontal_road == current_road &&
+               intersection->vertical_road == next_road;
+    }
+
+    return intersection->vertical_road == current_road &&
+           intersection->horizontal_road == next_road;
+}
+
+static void vehicle_set_direction_after_turn(Vehicle *vehicle, const Road *next_road)
+{
+    if (!vehicle || !next_road)
+        return;
+
+    if (next_road->type == ROAD_ONE_WAY)
+    {
+        vehicle->direction = vehicle_forward_direction_for_road(next_road);
+        return;
+    }
+
+    if (next_road->orientation == ROAD_HORIZONTAL)
+    {
+        vehicle->direction = (vehicle->direction == VEHICLE_DIRECTION_UP)
+                                 ? VEHICLE_DIRECTION_LEFT
+                                 : VEHICLE_DIRECTION_RIGHT;
+    }
+    else
+    {
+        vehicle->direction = (vehicle->direction == VEHICLE_DIRECTION_LEFT)
+                                 ? VEHICLE_DIRECTION_UP
+                                 : VEHICLE_DIRECTION_DOWN;
+    }
+}
+
+static void vehicle_follow_route_if_possible(Vehicle *vehicle, Intersection *intersection)
+{
+    if (!vehicle || !intersection || vehicle->route_length <= 1)
+        return;
+
+    int next_route_index = (vehicle->route_index + 1) % vehicle->route_length;
+    Road *next_road = vehicle->route[next_route_index];
+
+    if (!vehicle_roads_meet_at_intersection(intersection, vehicle->current_road, next_road))
         return;
 
     int next_index = (next_road->orientation == ROAD_HORIZONTAL)
-                         ? vehicle->col
-                         : vehicle->row;
+                         ? vehicle->position.col
+                         : vehicle->position.row;
 
     if (next_index < 0 || next_index >= next_road->cell_count)
         return;
 
     vehicle->current_road = next_road;
     vehicle->road_cell_index = next_index;
+    vehicle->route_index = next_route_index;
+    vehicle_set_direction_after_turn(vehicle, next_road);
 }
 
 static int vehicle_step(Vehicle *vehicle, int tick)
 {
+    (void)tick;
+
     CityMap *city = (CityMap *)vehicle->city_map;
     Road *road = vehicle->current_road;
 
@@ -81,10 +198,13 @@ static int vehicle_step(Vehicle *vehicle, int tick)
         return 0;
 
     int current_index = vehicle->road_cell_index;
-    int next_index = current_index + 1;
+    int next_index = -1;
 
-    if (next_index >= road->cell_count)
-        next_index = 0;
+    if (!vehicle_next_index(vehicle, current_index, &next_index))
+        return 0;
+
+    if (next_index < 0 || next_index >= road->cell_count)
+        return 0;
 
     Cell *origin = road_get_cell(road, current_index);
     Cell *destination = road_get_cell(road, next_index);
@@ -116,14 +236,16 @@ static int vehicle_step(Vehicle *vehicle, int tick)
         }
     }
 
+    if (!cell_wait_until_free(destination))
+        return 0;
+
     pthread_mutex_lock(&city->state_mutex);
     int moved = cell_move(origin, destination, vehicle);
 
     if (moved)
     {
         vehicle->road_cell_index = next_index;
-        vehicle->row = destination->row;
-        vehicle->col = destination->col;
+        vehicle_update_position(vehicle, destination);
     }
 
     pthread_mutex_unlock(&city->state_mutex);
@@ -132,7 +254,7 @@ static int vehicle_step(Vehicle *vehicle, int tick)
         intersection_release_priority(intersection);
 
     if (moved && intersection)
-        vehicle_turn_if_needed(vehicle, intersection, tick);
+        vehicle_follow_route_if_possible(vehicle, intersection);
 
     return moved;
 }
@@ -152,11 +274,40 @@ void vehicle_init(
     vehicle->road_cell_index = road_cell_index;
 
     Cell *cell = road_get_cell(road, road_cell_index);
-    vehicle->row = cell ? cell->row : 0;
-    vehicle->col = cell ? cell->col : 0;
+    vehicle->position.row = cell ? cell->row : 0;
+    vehicle->position.col = cell ? cell->col : 0;
+    vehicle->route[0] = road;
+    vehicle->route_length = road ? 1 : 0;
+    vehicle->route_index = 0;
     vehicle->active = 1;
     vehicle->is_ambulance = 0;
     vehicle->city_map = city_map;
+    vehicle_set_direction_from_road(vehicle);
+}
+
+void vehicle_set_route(Vehicle *vehicle, Road **route, int route_length)
+{
+    if (!vehicle || !route || route_length <= 0)
+        return;
+
+    if (route_length > VEHICLE_MAX_ROUTE_LENGTH)
+        route_length = VEHICLE_MAX_ROUTE_LENGTH;
+
+    vehicle->route_length = 0;
+
+    for (int i = 0; i < route_length; i++)
+    {
+        if (!route[i])
+            continue;
+
+        vehicle->route[vehicle->route_length++] = route[i];
+    }
+
+    if (vehicle->route_length == 0)
+        return;
+
+    int route_index = vehicle_route_contains_road(vehicle, vehicle->current_road);
+    vehicle->route_index = (route_index >= 0) ? route_index : 0;
 }
 
 void vehicle_set_ambulance(Vehicle *vehicle, int is_ambulance)

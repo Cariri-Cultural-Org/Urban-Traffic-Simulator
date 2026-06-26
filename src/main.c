@@ -12,6 +12,9 @@
 #define SIMULATION_TICKS (SIMULATION_MINUTES * 60 * TICKS_PER_SECOND)
 #define SIGNAL_PERIOD_TICKS 30
 #define VEHICLE_COUNT 14
+#define HORIZONTAL_ROUTE_COUNT 3
+#define VERTICAL_ROUTE_OFFSET 3
+#define VERTICAL_ROUTE_COUNT 4
 
 static int is_road_cell(CityMap *city, const Cell *cell, RoadOrientation orientation)
 {
@@ -107,9 +110,66 @@ static void wake_all_intersections(CityMap *city)
         intersection_wake_all(city->intersections[i]);
 }
 
+static int direction_moves_forward(VehicleDirection direction)
+{
+    return direction == VEHICLE_DIRECTION_RIGHT || direction == VEHICLE_DIRECTION_DOWN;
+}
+
+static int road_fixed_position(const Road *road)
+{
+    Cell *first_cell = road_get_cell(road, 0);
+
+    if (!first_cell)
+        return -1;
+
+    return (road->orientation == ROAD_HORIZONTAL) ? first_cell->row : first_cell->col;
+}
+
+static Road *find_next_crossing_road(
+    CityMap *city,
+    Road *road,
+    int start_index,
+    VehicleDirection direction
+)
+{
+    Road *fallback = NULL;
+    Road *best = NULL;
+    int best_distance = CITY_MAP_ROWS + CITY_MAP_COLS;
+    int moves_forward = direction_moves_forward(direction);
+
+    for (int i = 0; i < city->road_count; i++)
+    {
+        Road *candidate = city->roads[i];
+
+        if (!candidate || candidate->orientation == road->orientation)
+            continue;
+
+        if (!fallback)
+            fallback = candidate;
+
+        int crossing_index = road_fixed_position(candidate);
+        int distance = moves_forward
+                           ? crossing_index - start_index
+                           : start_index - crossing_index;
+
+        if (distance > 0 && distance < best_distance)
+        {
+            best = candidate;
+            best_distance = distance;
+        }
+    }
+
+    return best ? best : fallback;
+}
+
 static void initialize_vehicles(CityMap *city, Vehicle vehicles[VEHICLE_COUNT])
 {
-    const int speeds[] = {8, 10, 12, 15};
+    const int speeds[] = {
+        VEHICLE_SPEED_FAST,
+        VEHICLE_SPEED_MEDIUM,
+        VEHICLE_SPEED_SLOW,
+        VEHICLE_SPEED_FAST
+    };
 
     for (int i = 0; i < VEHICLE_COUNT; i++)
     {
@@ -124,10 +184,26 @@ static void initialize_vehicles(CityMap *city, Vehicle vehicles[VEHICLE_COUNT])
             start_index,
             city
         );
+
+        Road *second_road = find_next_crossing_road(
+            city,
+            road,
+            start_index,
+            vehicles[i].direction
+        );
+        Road *route[] = {
+            road,
+            second_road,
+            (road->orientation == ROAD_HORIZONTAL)
+                ? city->roads[(i + 1) % HORIZONTAL_ROUTE_COUNT]
+                : city->roads[VERTICAL_ROUTE_OFFSET + ((i + 1) % VERTICAL_ROUTE_COUNT)]
+        };
+
+        vehicle_set_route(&vehicles[i], route, 3);
     }
 
     vehicle_set_ambulance(&vehicles[0], 1);
-    vehicles[0].speed = 5;
+    vehicles[0].speed = VEHICLE_SPEED_FAST;
 }
 
 static int start_vehicle_threads(Vehicle vehicles[VEHICLE_COUNT])
