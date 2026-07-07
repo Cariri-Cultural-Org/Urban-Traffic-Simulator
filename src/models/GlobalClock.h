@@ -5,16 +5,13 @@
 
 #include "pthread_compat.h"
 
-#ifdef _WIN32
-typedef CRITICAL_SECTION os_mutex_t;
-typedef HANDLE os_thread_t;
-typedef CONDITION_VARIABLE os_cond_t;
-#else
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+
 typedef pthread_mutex_t os_mutex_t;
 typedef pthread_t os_thread_t;
 typedef pthread_cond_t os_cond_t;
-#endif
 
 // Variaveis globais para o relogio e controle de concorrencia
 extern int global_tick;
@@ -26,11 +23,7 @@ extern bool simulation_running;
 void init_global_clock(void);
 
 // Funcao da thread que ira gerenciar o relogio global
-#ifdef _WIN32
-DWORD WINAPI thread_global_clock(LPVOID arg);
-#else
 void *thread_global_clock(void *arg);
-#endif
 
 // Funcao para uma thread aguardar ate o proximo tick
 void wait_next_tick(int current_tick);

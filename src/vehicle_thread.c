@@ -237,6 +237,13 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
     if (!occupy_real_cell(vehicle, destination_cell))
     {
         vehicle->state = VEHICLE_STATE_WAITING_CELL;
+        simulation_output_log(
+            "[%s #%d] waiting: cell (%d,%d) is occupied\n",
+            vehicle_type_to_string(vehicle->type),
+            vehicle->id,
+            destination.row,
+            destination.column
+        );
         return 0;
     }
 
@@ -266,6 +273,13 @@ static int try_move_without_city_map(ThreadVehicle *vehicle, Position destinatio
     if (!cell_is_free(destination))
     {
         vehicle->state = VEHICLE_STATE_WAITING_CELL;
+        simulation_output_log(
+            "[%s #%d] waiting: cell (%d,%d) is occupied\n",
+            vehicle_type_to_string(vehicle->type),
+            vehicle->id,
+            destination.row,
+            destination.column
+        );
         return 0;
     }
 
@@ -310,8 +324,17 @@ static void occupy_initial_cell(ThreadVehicle *vehicle)
 
     cell = city_map_get_cell(vehicle->city_map, vehicle->position.row, vehicle->position.column);
 
-    if (cell)
-        occupy_real_cell(vehicle, cell);
+    if (cell && !occupy_real_cell(vehicle, cell))
+    {
+        vehicle->state = VEHICLE_STATE_WAITING_CELL;
+        simulation_output_log(
+            "[%s #%d] could not occupy initial cell (%d,%d)\n",
+            vehicle_type_to_string(vehicle->type),
+            vehicle->id,
+            vehicle->position.row,
+            vehicle->position.column
+        );
+    }
 }
 
 static void release_current_cell(ThreadVehicle *vehicle)
@@ -349,6 +372,9 @@ static void *vehicle_thread_run(void *arg)
     {
         wait_tick();
 
+        if (!simulation_running)
+            break;
+
         vehicle->tick_counter++;
 
         if (vehicle->tick_counter < (int)vehicle->speed)
@@ -372,8 +398,16 @@ static void *vehicle_thread_run(void *arg)
     release_current_cell(vehicle);
     vehicle->state = VEHICLE_STATE_FINISHED;
 
-    simulation_output_log("[%s #%d] route completed. Finishing thread.\n",
-                          vehicle_type_to_string(vehicle->type), vehicle->id);
+    if (vehicle->route_index >= vehicle->route_size)
+    {
+        simulation_output_log("[%s #%d] route completed. Finishing thread.\n",
+                              vehicle_type_to_string(vehicle->type), vehicle->id);
+    }
+    else
+    {
+        simulation_output_log("[%s #%d] stopped by simulation shutdown.\n",
+                              vehicle_type_to_string(vehicle->type), vehicle->id);
+    }
 
     return NULL;
 }
