@@ -55,6 +55,7 @@ void *thread_ambulance(void *arg)
         // A ambulância move-se a cada tick (velocidade = 1)
         Road *road = ambulance->current_road;
         int index = ambulance->road_cell_index;
+        Intersection *current_intersection = road_get_intersection(road, index);
 
         // Determina a próxima célula
         int next_index = index + 1;
@@ -78,8 +79,21 @@ void *thread_ambulance(void *arg)
             intersection = city_map_get_intersection(city_map, next_cell->row, next_cell->column);
             if (intersection != NULL)
             {
-                // Respeita o semáforo do cruzamento: aguarda o sinal verde normalmente
-                // NOTA: A prioridade da ambulância será integrada na próxima etapa (Semana 2)
+                int priority_changed =
+                    intersection_request_ambulance_priority(intersection, road->direction);
+
+                if (priority_changed)
+                {
+                    wait_next_tick(last_tick);
+                    last_tick = global_tick;
+
+                    if (!simulation_running || !ambulance->active)
+                    {
+                        intersection_clear_ambulance_priority(intersection);
+                        break;
+                    }
+                }
+
                 pthread_mutex_lock(&intersection->mutex);
                 intersection_wait_green(intersection, road->direction);
                 pthread_mutex_unlock(&intersection->mutex);
@@ -89,6 +103,9 @@ void *thread_ambulance(void *arg)
         // Move usando a mesma estrutura base de Vehicle.
         if (vehicle_try_move_to_road_index(ambulance, next_index))
         {
+            if (current_intersection != NULL)
+                intersection_clear_ambulance_priority(current_intersection);
+
             // Se a nova célula ocupada é um cruzamento, decide se vai virar
             if (next_is_intersection && intersection != NULL)
             {
@@ -115,7 +132,14 @@ void *thread_ambulance(void *arg)
     }
 
     // Libera a célula atual ao encerrar
+    Intersection *current_intersection =
+        road_get_intersection(ambulance->current_road, ambulance->road_cell_index);
     Cell *current_cell = road_get_cell(ambulance->current_road, ambulance->road_cell_index);
+    if (current_intersection != NULL)
+    {
+        intersection_clear_ambulance_priority(current_intersection);
+    }
+
     if (current_cell != NULL)
     {
         cell_release(current_cell);

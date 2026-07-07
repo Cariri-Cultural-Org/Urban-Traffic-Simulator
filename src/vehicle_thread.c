@@ -166,6 +166,7 @@ static int movement_respects_one_way(const Road *road, int origin_index, int des
 static int wait_signal_if_needed(ThreadVehicle *vehicle, Road *road, int destination_index)
 {
     Intersection *intersection = road_get_intersection(road, destination_index);
+    int priority_changed = 0;
 
     if (!intersection)
         return 1;
@@ -176,10 +177,40 @@ static int wait_signal_if_needed(ThreadVehicle *vehicle, Road *road, int destina
         return 1;
     }
 
+    if (vehicle->type == VEHICLE_TYPE_AMBULANCE)
+    {
+        priority_changed = intersection_request_ambulance_priority(intersection, road->direction);
+
+        if (priority_changed)
+        {
+            vehicle->state = VEHICLE_STATE_WAITING_SIGNAL;
+            wait_tick();
+
+            if (!simulation_running)
+                return 0;
+        }
+    }
+
     pthread_mutex_lock(&intersection->mutex);
+    if (intersection->green_direction != road->direction)
+        vehicle->state = VEHICLE_STATE_WAITING_SIGNAL;
+
     intersection_wait_green(intersection, road->direction);
     pthread_mutex_unlock(&intersection->mutex);
     return 1;
+}
+
+static void clear_ambulance_priority_at_position(ThreadVehicle *vehicle, Position position)
+{
+    Intersection *intersection;
+
+    if (!vehicle->city_map || vehicle->type != VEHICLE_TYPE_AMBULANCE)
+        return;
+
+    intersection = city_map_get_intersection(vehicle->city_map, position.row, position.column);
+
+    if (intersection)
+        intersection_clear_ambulance_priority(intersection);
 }
 
 static int occupy_real_cell(ThreadVehicle *vehicle, Cell *cell)
@@ -199,6 +230,7 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
     Road *road;
     Cell *origin_cell;
     Cell *destination_cell;
+    Intersection *origin_intersection;
 
     if (!city_map_is_valid_position(vehicle->city_map, destination.row, destination.column))
         return 0;
@@ -230,6 +262,7 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
 
     origin_cell = road_get_cell(road, origin_index);
     destination_cell = road_get_cell(road, destination_index);
+    origin_intersection = road_get_intersection(road, origin_index);
 
     if (!origin_cell || !destination_cell)
         return 0;
@@ -248,6 +281,10 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
     }
 
     cell_release(origin_cell);
+
+    if (vehicle->type == VEHICLE_TYPE_AMBULANCE && origin_intersection)
+        intersection_clear_ambulance_priority(origin_intersection);
+
     vehicle->current_road = road;
     vehicle->road_cell_index = destination_index;
     vehicle->position = destination;
@@ -350,7 +387,10 @@ static void release_current_cell(ThreadVehicle *vehicle)
     cell = city_map_get_cell(vehicle->city_map, vehicle->position.row, vehicle->position.column);
 
     if (cell)
+    {
+        clear_ambulance_priority_at_position(vehicle, vehicle->position);
         cell_release(cell);
+    }
 }
 
 static void *vehicle_thread_run(void *arg)

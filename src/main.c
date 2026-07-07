@@ -8,8 +8,9 @@
 #include "vehicle_thread.h"
 
 #define DEMO_ROUTE_LENGTH 10
+#define DEMO_VEHICLE_COUNT 3
 
-static Road *find_demo_road(CityMap *city_map)
+static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
 {
     if (!city_map)
         return NULL;
@@ -18,7 +19,7 @@ static Road *find_demo_road(CityMap *city_map)
     {
         Road *road = city_map->roads[i];
 
-        if (road && road->direction == ROAD_HORIZONTAL &&
+        if (road && road->direction == direction &&
             road->cell_count >= DEMO_ROUTE_LENGTH)
         {
             return road;
@@ -77,12 +78,14 @@ static void *clock_test_thread(void *arg)
 int main(void)
 {
     CityMap *city_map;
-    Road *demo_road;
+    Road *horizontal_road;
+    Road *vertical_road;
     os_thread_t clock_thread;
     os_thread_t test_thread;
-    ThreadVehicle vehicles[2];
-    Position slow_route[DEMO_ROUTE_LENGTH];
-    Position fast_route[DEMO_ROUTE_LENGTH];
+    ThreadVehicle vehicles[DEMO_VEHICLE_COUNT];
+    Position slow_car_route[DEMO_ROUTE_LENGTH];
+    Position fast_car_route[DEMO_ROUTE_LENGTH];
+    Position ambulance_route[DEMO_ROUTE_LENGTH];
     int started_vehicles = 0;
 
     simulation_output_init();
@@ -96,10 +99,11 @@ int main(void)
         return 1;
     }
 
-    demo_road = find_demo_road(city_map);
-    if (!demo_road)
+    horizontal_road = find_demo_road(city_map, ROAD_HORIZONTAL);
+    vertical_road = find_demo_road(city_map, ROAD_VERTICAL);
+    if (!horizontal_road || !vertical_road)
     {
-        simulation_output_log("ERROR: no horizontal road available for Increment 2 demo.\n");
+        simulation_output_log("ERROR: demo roads unavailable.\n");
         city_map_destroy(city_map);
         simulation_output_destroy();
         return 1;
@@ -109,8 +113,11 @@ int main(void)
                           city_map->rows, city_map->columns);
     simulation_output_log("Roads: %d | Intersections: %d\n",
                           city_map->road_count, city_map->intersection_count);
-    simulation_output_log("Increment 2 demo: two cars sharing road #%d\n",
-                          demo_road->id);
+    simulation_output_log(
+        "Demo: two cars on horizontal road #%d and ambulance on vertical road #%d\n",
+        horizontal_road->id,
+        vertical_road->id
+    );
 
     init_global_clock();
 
@@ -134,17 +141,18 @@ int main(void)
         return 1;
     }
 
-    build_route_from_road(demo_road, 1, slow_route, DEMO_ROUTE_LENGTH);
-    build_route_from_road(demo_road, 0, fast_route, DEMO_ROUTE_LENGTH);
+    build_route_from_road(horizontal_road, 1, slow_car_route, DEMO_ROUTE_LENGTH);
+    build_route_from_road(horizontal_road, 0, fast_car_route, DEMO_ROUTE_LENGTH);
+    build_route_from_road(vertical_road, 1, ambulance_route, DEMO_ROUTE_LENGTH);
 
     thread_vehicle_init(
         &vehicles[0],
         1,
         VEHICLE_TYPE_CAR,
-        slow_route[0],
+        slow_car_route[0],
         DIRECTION_EAST,
         SPEED_SLOW,
-        slow_route,
+        slow_car_route,
         DEMO_ROUTE_LENGTH
     );
     thread_vehicle_attach_city_map(&vehicles[0], city_map);
@@ -153,21 +161,33 @@ int main(void)
         &vehicles[1],
         2,
         VEHICLE_TYPE_CAR,
-        fast_route[0],
+        fast_car_route[0],
         DIRECTION_EAST,
         SPEED_FAST,
-        fast_route,
+        fast_car_route,
         DEMO_ROUTE_LENGTH
     );
     thread_vehicle_attach_city_map(&vehicles[1], city_map);
 
-    if (thread_vehicle_start(&vehicles[0]) == 0)
-        started_vehicles++;
+    thread_vehicle_init(
+        &vehicles[2],
+        3,
+        VEHICLE_TYPE_AMBULANCE,
+        ambulance_route[0],
+        DIRECTION_SOUTH,
+        SPEED_FAST,
+        ambulance_route,
+        DEMO_ROUTE_LENGTH
+    );
+    thread_vehicle_attach_city_map(&vehicles[2], city_map);
 
-    if (thread_vehicle_start(&vehicles[1]) == 0)
-        started_vehicles++;
+    for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
+    {
+        if (thread_vehicle_start(&vehicles[i]) == 0)
+            started_vehicles++;
+    }
 
-    if (started_vehicles != 2)
+    if (started_vehicles != DEMO_VEHICLE_COUNT)
     {
         simulation_output_log("ERROR: failed to start vehicle threads.\n");
         stop_global_clock();
@@ -183,7 +203,7 @@ int main(void)
         return 1;
     }
 
-    for (int i = 0; i < 12; i++)
+    for (int i = 0; i < 14; i++)
     {
         int observed_tick = global_tick;
 
@@ -200,8 +220,8 @@ int main(void)
     stop_global_clock();
     city_map_broadcast_intersections(city_map);
 
-    thread_vehicle_join(&vehicles[0]);
-    thread_vehicle_join(&vehicles[1]);
+    for (int i = 0; i < started_vehicles; i++)
+        thread_vehicle_join(&vehicles[i]);
     pthread_join(test_thread, NULL);
     pthread_join(clock_thread, NULL);
 

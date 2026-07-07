@@ -15,6 +15,7 @@ typedef struct Intersection
     Road *vertical_road;
 
     RoadDirection green_direction;
+    RoadDirection previous_green_direction;
     pthread_mutex_t mutex; // Bloqueia passagem durante o sinal verde
     pthread_cond_t horizontal_cond;
     pthread_cond_t vertical_cond;
@@ -29,5 +30,7 @@ Intersection *intersection_create(int id, int row, int column,
 void intersection_destroy(Intersection *intersection);
 void intersection_toggle_signal(Intersection *intersection);
 void intersection_wait_green(Intersection *intersection, RoadDirection road_direction);
+int intersection_request_ambulance_priority(Intersection *intersection, RoadDirection road_direction);
+void intersection_clear_ambulance_priority(Intersection *intersection);
 
 #endif
