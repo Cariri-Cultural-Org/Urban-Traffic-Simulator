@@ -19,4 +19,7 @@ void release_cells(CityMap *city_map, int allocated_rows);
 void release_roads(CityMap *city_map);
 void release_intersections(CityMap *city_map);
 
+/* Wake-up final para encerrar threads bloqueadas em semáforos */
+void city_map_broadcast_intersections(CityMap *city_map);
+
 #endif /* CITY_MAP_UTILS_H */

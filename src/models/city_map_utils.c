@@ -89,6 +89,25 @@ void release_roads(CityMap *city_map)
     city_map->roads = NULL;
 }
 
+void city_map_broadcast_intersections(CityMap *city_map)
+{
+    if (!city_map || !city_map->intersections)
+        return;
+
+    for (int i = 0; i < city_map->intersection_count; i++)
+    {
+        Intersection *intersection = city_map->intersections[i];
+
+        if (!intersection)
+            continue;
+
+        pthread_mutex_lock(&intersection->mutex);
+        pthread_cond_broadcast(&intersection->horizontal_cond);
+        pthread_cond_broadcast(&intersection->vertical_cond);
+        pthread_mutex_unlock(&intersection->mutex);
+    }
+}
+
 /* ── Funções de alocação ───────────────────────────────────────────────────── */
 
 int allocate_cells(CityMap *city_map)
