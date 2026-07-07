@@ -79,12 +79,12 @@ void intersection_wait_green(Intersection *intersection, RoadDirection road_dire
 {
     if (road_direction == ROAD_HORIZONTAL)
     {
-        while (intersection->green_direction != ROAD_HORIZONTAL)
+        while (simulation_running && intersection->green_direction != ROAD_HORIZONTAL)
             pthread_cond_wait(&intersection->horizontal_cond, &intersection->mutex);
     }
     else
     {
-        while (intersection->green_direction != ROAD_VERTICAL)
+        while (simulation_running && intersection->green_direction != ROAD_VERTICAL)
             pthread_cond_wait(&intersection->vertical_cond, &intersection->mutex);
     }
 }

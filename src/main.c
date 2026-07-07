@@ -2,6 +2,7 @@
 
 #include "SimulationOutput.h"
 #include "models/CityMap.h"
+#include "models/city_map_utils.h"
 #include "models/GlobalClock.h"
 #include "models/Road.h"
 #include "vehicle_thread.h"
@@ -197,6 +198,7 @@ int main(void)
 
     simulation_output_log("Stopping simulation...\n");
     stop_global_clock();
+    city_map_broadcast_intersections(city_map);
 
     thread_vehicle_join(&vehicles[0]);
     thread_vehicle_join(&vehicles[1]);
