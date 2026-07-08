@@ -1,6 +1,6 @@
 # Compilador e Flags
 CC = gcc
-CFLAGS = -Wall -Wextra -g3 -D_WIN32_WINNT=0x0600
+CFLAGS = -Wall -Wextra -g3 -D_WIN32_WINNT=0x0600 -Isrc
 
 # Detecta o sistema operacional para definir regras específicas
 ifeq ($(OS),Windows_NT)
@@ -18,7 +18,7 @@ else
 endif
 
 # Lista de arquivos C e Objetos
-SRCS = src/main.c src/SimulationOutput.c src/vehicle_thread.c src/models/GlobalClock.c src/models/TrafficLight.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/CityMapRenderer.c src/models/city_map_utils.c src/models/Vehicle.c src/models/Ambulance.c
+SRCS = src/main.c src/models/SimulationOutput.c src/models/vehicle_thread.c src/models/GlobalClock.c src/models/TrafficLight.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/CityMapRenderer.c src/models/city_map_utils.c src/models/Vehicle.c src/models/Ambulance.c
 OBJS = $(SRCS:.c=.o)
 
 # Regra principal (a primeira a rodar se digitar apenas "make")

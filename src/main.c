@@ -1,11 +1,10 @@
 #include <stdio.h>
-
-#include "SimulationOutput.h"
+#include "models/SimulationOutput.h"
 #include "models/CityMap.h"
 #include "models/city_map_utils.h"
 #include "models/GlobalClock.h"
 #include "models/Road.h"
-#include "vehicle_thread.h"
+#include "models/vehicle_thread.h"
 
 #define DEMO_ROUTE_LENGTH 10
 #define DEMO_VEHICLE_COUNT 3
