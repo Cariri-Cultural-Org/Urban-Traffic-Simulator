@@ -1,14 +1,14 @@
 #include <stdio.h>
-
-#include "SimulationOutput.h"
+#include "models/SimulationOutput.h"
 #include "models/CityMap.h"
 #include "models/city_map_utils.h"
 #include "models/GlobalClock.h"
 #include "models/Road.h"
-#include "vehicle_thread.h"
+#include "models/vehicle_thread.h"
 
 #define DEMO_ROUTE_LENGTH 10
 #define DEMO_VEHICLE_COUNT 3
+#define SIGNAL_INTERVAL_TICKS 3
 
 static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
 {
@@ -73,6 +73,18 @@ static void *clock_test_thread(void *arg)
 
     simulation_output_log("[Test] finished with global clock\n");
     return NULL;
+}
+
+static void toggle_city_map_signals(CityMap *city_map)
+{
+    if (!city_map || !city_map->intersections)
+        return;
+
+    for (int i = 0; i < city_map->intersection_count; i++)
+    {
+        if (city_map->intersections[i])
+            intersection_toggle_signal(city_map->intersections[i]);
+    }
 }
 
 int main(void)
@@ -141,8 +153,9 @@ int main(void)
         return 1;
     }
 
-    build_route_from_road(horizontal_road, 1, slow_car_route, DEMO_ROUTE_LENGTH);
-    build_route_from_road(horizontal_road, 0, fast_car_route, DEMO_ROUTE_LENGTH);
+    // probably wrong, the car need to synchronize with clock tick
+    build_route_from_road(horizontal_road, 2, fast_car_route, DEMO_ROUTE_LENGTH);
+    build_route_from_road(horizontal_road, 0, slow_car_route, DEMO_ROUTE_LENGTH);
     build_route_from_road(vertical_road, 1, ambulance_route, DEMO_ROUTE_LENGTH);
 
     thread_vehicle_init(
@@ -208,6 +221,11 @@ int main(void)
         int observed_tick = global_tick;
 
         wait_next_tick(observed_tick);
+        if (global_tick % SIGNAL_INTERVAL_TICKS == 0)
+            toggle_city_map_signals(city_map);
+
+        // printf("\033[H\033[J");
+        fflush(stdout);
 
         if (!simulation_output_render_city_map(city_map, stdout, global_tick))
         {
