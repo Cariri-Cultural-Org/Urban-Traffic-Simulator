@@ -1,4 +1,5 @@
 #include "GlobalClock.h"
+#define TICK_DELAY_MS 1000
 
 int global_tick = 0;
 os_mutex_t clock_mutex;
@@ -21,9 +22,9 @@ void *thread_global_clock(void *arg)
     {
         // Pausa simulando a passagem de tempo de 1 tick (ex: 100ms)
 #ifdef _WIN32
-        Sleep(100);
+        Sleep(TICK_DELAY_MS);
 #else
-        usleep(100000);
+        usleep(TICK_DELAY_MS * 1000);
 #endif
 
         pthread_mutex_lock(&clock_mutex);
