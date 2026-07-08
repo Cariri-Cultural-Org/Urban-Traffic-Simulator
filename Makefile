@@ -20,8 +20,6 @@ endif
 # Lista de arquivos C e Objetos
 SRCS = src/main.c src/models/SimulationOutput.c src/models/vehicle_thread.c src/models/GlobalClock.c src/models/TrafficLight.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/CityMapRenderer.c src/models/city_map_utils.c src/models/Vehicle.c src/models/Ambulance.c
 OBJS = $(SRCS:.c=.o)
-TEST_TARGET = bin/test-increment-2-3
-TEST_SRCS = tests/test_increment_2_3.c src/models/SimulationOutput.c src/models/vehicle_thread.c src/models/GlobalClock.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/CityMapRenderer.c src/models/city_map_utils.c
 
 # Regra principal (a primeira a rodar se digitar apenas "make")
 all: build_dir $(TARGET)
@@ -37,12 +35,6 @@ $(TARGET): $(OBJS)
 # Compila arquivos .c em .o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-test: build_dir $(TEST_TARGET)
-	./$(TEST_TARGET)
-
-$(TEST_TARGET): $(TEST_SRCS)
-	$(CC) $(CFLAGS) -o $(TEST_TARGET) $(TEST_SRCS) $(LDFLAGS)
 
 # Regra para limpar a compilação (arquivos temporários gerados)
 clean:

@@ -4,7 +4,6 @@
 
 #include "pthread_compat.h"
 #include "Road.h"
-#include "TrafficLight.h"
 
 typedef struct Intersection
 {
