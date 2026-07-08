@@ -75,37 +75,16 @@ static void *clock_test_thread(void *arg)
     return NULL;
 }
 
-static void toggle_city_map_signals(CityMap *city_map, int tick)
+static void toggle_city_map_signals(CityMap *city_map)
 {
-    int horizontal_green = 0;
-    int vertical_green = 0;
-
     if (!city_map || !city_map->intersections)
         return;
 
     for (int i = 0; i < city_map->intersection_count; i++)
     {
-        Intersection *intersection = city_map->intersections[i];
-
-        if (!intersection)
-            continue;
-
-        intersection_toggle_signal(intersection);
-
-        pthread_mutex_lock(&intersection->mutex);
-        if (intersection->green_direction == ROAD_HORIZONTAL)
-            horizontal_green++;
-        else
-            vertical_green++;
-        pthread_mutex_unlock(&intersection->mutex);
+        if (city_map->intersections[i])
+            intersection_toggle_signal(city_map->intersections[i]);
     }
-
-    simulation_output_log(
-        "[Tick %d] Cruzamentos alternados: %d com horizontal verde, %d com vertical verde\n",
-        tick,
-        horizontal_green,
-        vertical_green
-    );
 }
 
 int main(void)
@@ -243,7 +222,7 @@ int main(void)
 
         wait_next_tick(observed_tick);
         if (global_tick % SIGNAL_INTERVAL_TICKS == 0)
-            toggle_city_map_signals(city_map, global_tick);
+            toggle_city_map_signals(city_map);
 
         // printf("\033[H\033[J");
         fflush(stdout);
