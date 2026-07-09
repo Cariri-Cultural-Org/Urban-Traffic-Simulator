@@ -78,6 +78,10 @@ void thread_vehicle_init(
 );
 void thread_vehicle_attach_city_map(ThreadVehicle *vehicle, CityMap *city_map);
 
+int thread_vehicle_place(ThreadVehicle *vehicle);
+int thread_vehicle_advance_one_step(ThreadVehicle *vehicle);
+void thread_vehicle_release(ThreadVehicle *vehicle);
+
 int thread_vehicle_start(ThreadVehicle *vehicle);
 void thread_vehicle_join(ThreadVehicle *vehicle);
 int thread_vehicles_create_all(ThreadVehicle vehicles[], int quantity);

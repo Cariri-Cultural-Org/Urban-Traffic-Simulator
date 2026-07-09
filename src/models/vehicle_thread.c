@@ -72,6 +72,60 @@ static char vehicle_type_to_symbol(VehicleType type)
     return type == VEHICLE_TYPE_AMBULANCE ? 'A' : 'C';
 }
 
+static struct Vehicle *vehicle_cell_pointer(ThreadVehicle *vehicle)
+{
+    return (struct Vehicle *)vehicle;
+}
+
+static int cell_precedes(const Cell *left, const Cell *right)
+{
+    if (left->row != right->row)
+        return left->row < right->row;
+
+    if (left->column != right->column)
+        return left->column < right->column;
+
+    return left < right;
+}
+
+static void lock_cell_pair(Cell *first, Cell *second)
+{
+    if (first == second)
+    {
+        pthread_mutex_lock(&first->mutex);
+        return;
+    }
+
+    if (cell_precedes(second, first))
+    {
+        Cell *tmp = first;
+        first = second;
+        second = tmp;
+    }
+
+    pthread_mutex_lock(&first->mutex);
+    pthread_mutex_lock(&second->mutex);
+}
+
+static void unlock_cell_pair(Cell *first, Cell *second)
+{
+    if (first == second)
+    {
+        pthread_mutex_unlock(&first->mutex);
+        return;
+    }
+
+    if (cell_precedes(second, first))
+    {
+        Cell *tmp = first;
+        first = second;
+        second = tmp;
+    }
+
+    pthread_mutex_unlock(&second->mutex);
+    pthread_mutex_unlock(&first->mutex);
+}
+
 static int positions_are_equal(Position a, Position b)
 {
     return a.row == b.row && a.column == b.column;
@@ -231,11 +285,75 @@ static void clear_ambulance_priority_at_position(ThreadVehicle *vehicle, Positio
 
 static int occupy_real_cell(ThreadVehicle *vehicle, Cell *cell)
 {
-    return cell_try_occupy_with_symbol(
-        cell,
-        (struct Vehicle *)vehicle,
-        vehicle_type_to_symbol(vehicle->type)
-    );
+    int success = 0;
+
+    if (!vehicle || !cell)
+        return 0;
+
+    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    pthread_mutex_lock(&cell->mutex);
+
+    if (!cell->occupied)
+    {
+        cell->occupied = 1;
+        cell->occupant_symbol = vehicle_type_to_symbol(vehicle->type);
+        cell->vehicle = vehicle_cell_pointer(vehicle);
+        success = 1;
+    }
+
+    pthread_mutex_unlock(&cell->mutex);
+    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
+
+    return success;
+}
+
+static int move_real_cell(ThreadVehicle *vehicle, Cell *origin_cell, Cell *destination_cell)
+{
+    int success = 0;
+
+    if (!vehicle || !origin_cell || !destination_cell)
+        return 0;
+
+    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    lock_cell_pair(origin_cell, destination_cell);
+
+    if (origin_cell->occupied &&
+        origin_cell->vehicle == vehicle_cell_pointer(vehicle) &&
+        !destination_cell->occupied)
+    {
+        origin_cell->occupied = 0;
+        origin_cell->occupant_symbol = ' ';
+        origin_cell->vehicle = NULL;
+
+        destination_cell->occupied = 1;
+        destination_cell->occupant_symbol = vehicle_type_to_symbol(vehicle->type);
+        destination_cell->vehicle = vehicle_cell_pointer(vehicle);
+        success = 1;
+    }
+
+    unlock_cell_pair(origin_cell, destination_cell);
+    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
+
+    return success;
+}
+
+static void release_real_cell(ThreadVehicle *vehicle, Cell *cell)
+{
+    if (!vehicle || !cell)
+        return;
+
+    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    pthread_mutex_lock(&cell->mutex);
+
+    if (cell->vehicle == vehicle_cell_pointer(vehicle))
+    {
+        cell->occupied = 0;
+        cell->occupant_symbol = ' ';
+        cell->vehicle = NULL;
+    }
+
+    pthread_mutex_unlock(&cell->mutex);
+    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
 }
 
 static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
@@ -290,7 +408,7 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
     if (!origin_cell || !destination_cell)
         return 0;
 
-    if (!occupy_real_cell(vehicle, destination_cell))
+    if (!move_real_cell(vehicle, origin_cell, destination_cell))
     {
         vehicle->state = VEHICLE_STATE_WAITING_CELL;
         simulation_output_log(
@@ -302,8 +420,6 @@ static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)
         );
         return 0;
     }
-
-    cell_release(origin_cell);
 
     if (vehicle->type == VEHICLE_TYPE_AMBULANCE && origin_intersection)
         intersection_clear_ambulance_priority(origin_intersection);
@@ -372,19 +488,22 @@ static int try_move(ThreadVehicle *vehicle)
     return try_move_without_city_map(vehicle, destination);
 }
 
-static void occupy_initial_cell(ThreadVehicle *vehicle)
+static int occupy_initial_cell(ThreadVehicle *vehicle)
 {
     Cell *cell;
 
     if (!vehicle->city_map)
     {
         cell_occupy(vehicle->position, vehicle->id);
-        return;
+        return 1;
     }
 
     cell = city_map_get_cell(vehicle->city_map, vehicle->position.row, vehicle->position.column);
 
-    if (cell && !occupy_real_cell(vehicle, cell))
+    if (cell && occupy_real_cell(vehicle, cell))
+        return 1;
+
+    if (cell)
     {
         vehicle->state = VEHICLE_STATE_WAITING_CELL;
         simulation_output_log(
@@ -395,6 +514,8 @@ static void occupy_initial_cell(ThreadVehicle *vehicle)
             vehicle->position.column
         );
     }
+
+    return 0;
 }
 
 static void release_current_cell(ThreadVehicle *vehicle)
@@ -412,7 +533,7 @@ static void release_current_cell(ThreadVehicle *vehicle)
     if (cell)
     {
         clear_ambulance_priority_at_position(vehicle, vehicle->position);
-        cell_release(cell);
+        release_real_cell(vehicle, cell);
     }
 }
 
@@ -429,7 +550,12 @@ static void *vehicle_thread_run(void *arg)
         (int)vehicle->speed
     );
 
-    occupy_initial_cell(vehicle);
+    if (!occupy_initial_cell(vehicle))
+    {
+        simulation_output_log("[%s #%d] did not start because initial cell is unavailable.\n",
+                              vehicle_type_to_string(vehicle->type), vehicle->id);
+        return NULL;
+    }
 
     while (simulation_running && vehicle->route_index < vehicle->route_size)
     {
@@ -506,6 +632,30 @@ void thread_vehicle_attach_city_map(ThreadVehicle *vehicle, CityMap *city_map)
         return;
 
     vehicle->city_map = city_map;
+}
+
+int thread_vehicle_place(ThreadVehicle *vehicle)
+{
+    if (!vehicle)
+        return 0;
+
+    return occupy_initial_cell(vehicle);
+}
+
+int thread_vehicle_advance_one_step(ThreadVehicle *vehicle)
+{
+    if (!vehicle)
+        return 0;
+
+    return try_move(vehicle);
+}
+
+void thread_vehicle_release(ThreadVehicle *vehicle)
+{
+    if (!vehicle)
+        return;
+
+    release_current_cell(vehicle);
 }
 
 int thread_vehicle_start(ThreadVehicle *vehicle)

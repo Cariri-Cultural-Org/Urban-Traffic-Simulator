@@ -1,315 +1,62 @@
 # Simulador de Tráfego Urbano
 
-Este projeto simula o funcionamento de uma pequena malha de trânsito utilizando
-**C**, **threads**, **mutexes** e **variáveis de condição**.
+Simulador em **C** para demonstrar concorrência com threads, mutexes e
+variáveis de condição em uma pequena malha de trânsito.
 
-A ideia principal é representar a cidade como uma matriz de células. As ruas
-são formadas por conjuntos dessas células, e os veículos devem percorrê-las sem
-ocupar a mesma posição ao mesmo tempo.
+O executável atual cria um mapa real, inicia um relógio global, alterna os
+sinais dos cruzamentos, executa veículos em threads e renderiza frames ASCII da
+simulação.
 
-O projeto foi desenvolvido para a disciplina de Sistemas Operacionais e tem
-como foco o estudo de concorrência, sincronização de recursos e prevenção de
-condições de corrida.
+## Estado Atual
 
-## Como o projeto funciona
+O `main.c` executa uma demonstração fixa com:
 
-A lógica principal pode ser dividida em cinco partes:
+- mapa de `20x40`;
+- 7 vias, sendo 3 horizontais e 4 verticais;
+- 12 cruzamentos reais;
+- 10 veículos em threads, incluindo uma ambulância;
+- velocidades de 1, 2 e 4 ticks;
+- alternância dos cruzamentos a cada 3 ticks;
+- encerramento com `stop`, `broadcast`, `join` e destruição dos recursos.
 
-1. Estrutura do mapa
-2. Células e vias
-3. Cruzamentos e semáforos
-4. Relógio global
-5. Veículos e sincronização
+O binário gerado é:
 
-## Estrutura do mapa
-
-O mapa é representado pela estrutura `Mapa`, definida em
-`src/models/Mapa.h`.
-
-```c
-typedef struct
-{
-    int linhas;
-    int colunas;
-
-    Celula **celulas;
-    Via **vias;
-    int num_vias;
-
-    Cruzamento **cruzamentos;
-    int num_cruzamentos;
-} Mapa;
+```bash
+bin/traffic-simulator
 ```
 
-As dimensões são definidas pelas constantes:
+## Como Executar
 
-```c
-#define MAPA_LINHAS 20
-#define MAPA_COLUNAS 40
+No Linux, macOS ou WSL:
+
+```bash
+make
+./bin/traffic-simulator
 ```
 
-Isso significa que a cidade possui uma matriz de `20x40`, totalizando `800`
-posições.
+No Windows com MinGW:
 
-Cada posição representa uma `Celula`. As vias e os cruzamentos utilizam essas
-células para organizar a malha viária.
-
-## Layout da malha viária
-
-O layout do mapa é fixo. Existem três vias horizontais e quatro vias verticais.
-
-```text
-         col8   col16  col24  col32
-           |      |      |      |
-lin4  ----+------+------+------+----  mão única →
-           |      |      |      |
-lin10 ----+------+------+------+----  mão dupla
-           |      |      |      |
-lin16 ----+------+------+------+----  mão dupla
-           |      |      |      |
-         dupla  única  dupla  dupla
-                  ↓
+```cmd
+mingw32-make
+.\bin\traffic-simulator.exe
 ```
 
-As vias horizontais estão localizadas nas linhas `4`, `10` e `16`.
+Para rodar os testes:
 
-```c
-static const int LINHAS_H[] = {4, 10, 16};
+```bash
+make test
 ```
 
-As vias verticais estão localizadas nas colunas `8`, `16`, `24` e `32`.
+Para remover arquivos gerados:
 
-```c
-static const int COLUNAS_V[] = {8, 16, 24, 32};
+```bash
+make clean
 ```
 
-A linha 4 é uma via de mão única da esquerda para a direita. A coluna 16 também
-é de mão única, de cima para baixo. As demais vias são configuradas como mão
-dupla.
+São necessários GCC, GNU Make e suporte a `pthreads` em sistemas POSIX ou
+MinGW no Windows.
 
-Cada uma das três vias horizontais cruza as quatro vias verticais. Portanto, o
-mapa possui:
-
-```text
-3 vias horizontais × 4 vias verticais = 12 cruzamentos
-```
-
-## Células
-
-A estrutura `Celula` representa uma posição do mapa.
-
-```c
-typedef struct
-{
-    int linha;
-    int coluna;
-    int ocupada;
-    struct Veiculo *veiculo;
-    pthread_mutex_t mutex;
-} Celula;
-```
-
-Cada célula armazena:
-
-- sua linha e sua coluna;
-- a informação de ocupação;
-- um ponteiro para o veículo presente;
-- um mutex para proteger o acesso concorrente.
-
-Quando um veículo tenta avançar, a célula de destino precisa estar livre. A
-operação de ocupação utiliza o mutex da célula para impedir que duas threads
-ocupem a mesma posição simultaneamente.
-
-De forma simplificada, a lógica é:
-
-```text
-bloquear mutex da célula
-    ↓
-verificar se está livre
-    ↓
-registrar o veículo
-    ↓
-liberar mutex
-```
-
-A função `celula_tentar_ocupar()` realiza a tentativa de ocupação, enquanto
-`celula_liberar()` libera a posição anterior do veículo.
-
-## Vias
-
-Uma `Via` representa uma rua horizontal ou vertical.
-
-```c
-typedef struct
-{
-    int id;
-    DirecaoVia direcao;
-    SentidoVia sentido;
-
-    Celula **celulas;
-    Cruzamento **cruzamentos;
-    int num_celulas;
-} Via;
-```
-
-As células de uma via não são cópias separadas. A estrutura armazena ponteiros
-para células que já pertencem ao mapa.
-
-Por exemplo, a via horizontal da linha 4 utiliza as posições:
-
-```text
-(4,0) → (4,1) → (4,2) → ... → (4,39)
-```
-
-A via vertical da coluna 8 utiliza:
-
-```text
-(0,8)
-  ↓
-(1,8)
-  ↓
- ...
-  ↓
-(19,8)
-```
-
-Quando essas vias se encontram em `(4,8)`, ambas apontam para a mesma célula.
-Essa posição também recebe um objeto `Cruzamento`.
-
-No estado atual, o tipo da via registra se ela é de mão única ou mão dupla. A
-representação completa de duas faixas independentes em sentidos opostos ainda
-está em desenvolvimento.
-
-## Cruzamentos
-
-Um `Cruzamento` conecta uma via horizontal e uma via vertical.
-
-```c
-typedef struct Cruzamento
-{
-    int id;
-    int linha;
-    int coluna;
-    Via *via_h;
-    Via *via_v;
-
-    DirecaoVia direcao_verde;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond_h;
-    pthread_cond_t cond_v;
-
-    int ambulancia_presente;
-    DirecaoVia direcao_ambulancia;
-} Cruzamento;
-```
-
-O campo `direcao_verde` informa qual fluxo pode atravessar o cruzamento. Se a
-direção horizontal estiver verde, a vertical deve aguardar, e vice-versa.
-
-As variáveis de condição `cond_h` e `cond_v` permitem bloquear as threads dos
-veículos sem consumir processamento enquanto o sinal correspondente estiver
-vermelho.
-
-De forma simplificada:
-
-```text
-veículo chega ao cruzamento
-    ↓
-verifica a direção liberada
-    ↓
-sinal vermelho → aguarda a variável de condição
-sinal verde    → tenta ocupar a próxima célula
-```
-
-A estrutura também possui campos reservados para conceder prioridade à
-ambulância.
-
-## Relógio global
-
-O relógio global coordena a passagem do tempo da simulação.
-
-```c
-int global_tick = 0;
-os_mutex_t clock_mutex;
-os_cond_t clock_cond;
-bool simulation_running = true;
-```
-
-A thread do relógio aguarda aproximadamente `100ms`, incrementa o tick e acorda
-as threads que estão esperando o próximo ciclo.
-
-```c
-usleep(100000);
-pthread_mutex_lock(&clock_mutex);
-
-global_tick++;
-pthread_cond_broadcast(&clock_cond);
-
-pthread_mutex_unlock(&clock_mutex);
-```
-
-Assim, um tick funciona como uma unidade de tempo compartilhada. Veículos,
-semáforos e outros componentes podem aguardar o próximo tick por meio da função
-`esperar_proximo_tick()`.
-
-O uso de variável de condição evita um loop verificando continuamente o valor
-do relógio.
-
-## Semáforos
-
-O módulo `Semaforo` armazena o estado atual e a duração dos períodos verde e
-vermelho.
-
-```c
-if (sem->estado == VERMELHO &&
-    sem->tick_atual >= sem->tempo_vermelho)
-{
-    sem->estado = VERDE;
-    sem->tick_atual = 0;
-}
-```
-
-A cada tick, `atualizar_semaforo()` incrementa o contador interno. Quando o
-tempo configurado é alcançado, o estado é alternado e o contador volta para
-zero.
-
-Na execução atual de `main.c`, um semáforo de demonstração é atualizado durante
-10 ticks. A integração completa entre relógio, mapa, cruzamentos e veículos
-ainda está em desenvolvimento.
-
-## Veículos e sincronização
-
-Os veículos são os agentes que percorrem as vias. Cada veículo deve executar em
-sua própria thread e compartilhar as células do mapa com os demais.
-
-Para um movimento ser seguro, a simulação precisa garantir que:
-
-- a célula de destino pertence à rota;
-- o veículo respeita o sentido da via;
-- o sinal do cruzamento está verde;
-- a célula de destino está livre;
-- dois veículos não ocupam a mesma célula;
-- nenhum mutex permanece bloqueado durante a espera por tick ou sinal.
-
-O fluxo esperado de movimento é:
-
-```text
-aguardar o próximo tick
-    ↓
-verificar sinal e rota
-    ↓
-tentar ocupar a célula seguinte
-    ↓
-liberar a célula anterior
-    ↓
-atualizar a posição do veículo
-```
-
-Quando mais de um mutex precisar ser adquirido, todos os módulos devem seguir
-uma ordem determinística. Essa regra reduz o risco de espera circular e
-deadlock.
-
-## Estrutura dos arquivos
+## Estrutura Principal
 
 ```text
 .
@@ -321,80 +68,199 @@ deadlock.
 ├── src/
 │   ├── main.c
 │   └── models/
-│       ├── Celula.c
-│       ├── Cruzamento.c
-│       ├── Mapa.c
-│       ├── Relogio_global.c
-│       ├── Semaforo.c
-│       ├── Via.c
-│       └── Veiculo.c
+│       ├── Ambulance.c
+│       ├── Cell.c
+│       ├── CityMap.c
+│       ├── CityMapRenderer.c
+│       ├── GlobalClock.c
+│       ├── Intersection.c
+│       ├── Road.c
+│       ├── SimulationOutput.c
+│       ├── TrafficLight.c
+│       ├── Vehicle.c
+│       ├── city_map_utils.c
+│       └── vehicle_thread.c
+├── tests/
+│   ├── test_intersection_priority.c
+│   └── test_vehicle_invariants.c
 ├── Makefile
 └── README.md
 ```
 
-## Como executar o projeto
+## Mapa
 
-O projeto utiliza vários arquivos-fonte. Por isso, ele deve ser compilado pelo
-`Makefile` a partir da pasta raiz.
+O mapa é representado por `CityMap`, definido em `src/models/CityMap.h`.
 
-No Linux, macOS ou WSL:
+```c
+typedef struct
+{
+    int rows;
+    int columns;
+    pthread_mutex_t state_mutex;
 
-```bash
-make
-./bin/simulador
+    Cell **cells;
+    Road **roads;
+    int road_count;
+
+    Intersection **intersections;
+    int intersection_count;
+} CityMap;
 ```
 
-No Windows com MinGW:
+As dimensões são:
 
-```cmd
-mingw32-make
-.\bin\simulador.exe
+```c
+#define CITY_MAP_ROWS 20
+#define CITY_MAP_COLUMNS 40
 ```
 
-Para remover os arquivos gerados:
+O layout atual é fixo:
 
-```bash
-make clean
+```text
+         col8   col16  col24  col32
+           |      |      |      |
+row4  ----+------+------+------+----  mão única →
+           |      |      |      |
+row10 ----+------+------+------+----  mão dupla
+           |      |      |      |
+row16 ----+------+------+------+----  mão dupla
+           |      |      |      |
+         dupla  única  dupla  dupla
+                  ↓
 ```
 
-São necessários GCC, GNU Make e suporte a `pthreads` em sistemas POSIX ou MinGW
-no Windows.
+Cada cruzamento é compartilhado pela via horizontal e pela via vertical que se
+encontram naquela célula.
 
-## Orientações para participantes
+## Células
 
-Antes de modificar uma estrutura compartilhada, verifique os contratos
-declarados nos arquivos `.h` e os módulos que utilizam essa estrutura.
+`Cell` representa uma posição do mapa:
 
-Ao implementar uma funcionalidade concorrente:
+```c
+typedef struct
+{
+    int row;
+    int column;
+    int occupied;
+    char occupant_symbol;
+    struct Vehicle *vehicle;
+    pthread_mutex_t mutex;
+} Cell;
+```
 
-- proteja toda leitura e escrita de estado compartilhado;
-- utilize variáveis de condição para espera bloqueante;
-- não aguarde um tick ou sinal segurando o mutex de uma célula;
-- mantenha uma ordem única para aquisição de múltiplos mutexes;
-- finalize e aguarde as threads antes de destruir seus recursos;
-- compile o projeto e valide o comportamento após cada alteração.
+Cada célula possui um mutex próprio para proteger ocupação, liberação, símbolo
+renderizado e ponteiro do ocupante.
 
-Mais detalhes estão disponíveis na
-[explicação do projeto](docs/explicacao_projeto.md) e na
-[divisão de tarefas](docs/tasks-division.md).
+O movimento em `vehicle_thread.c` usa também `CityMap.state_mutex` para impedir
+que o renderer leia um frame no meio da troca entre célula de origem e célula
+de destino. Assim, um frame não deve mostrar o mesmo veículo em duas posições.
 
-## Resumo da lógica
+## Vias
 
-O projeto funciona da seguinte forma:
+`Road` guarda ponteiros para células que pertencem ao mapa.
 
-- uma matriz de `20x40` representa a cidade;
-- cada posição da matriz é uma célula protegida por mutex;
-- as vias armazenam ponteiros para as células do mapa;
-- três vias horizontais e quatro verticais formam 12 cruzamentos;
-- os cruzamentos controlam qual direção pode avançar;
-- o relógio global produz um tick aproximadamente a cada `100ms`;
-- variáveis de condição acordam as threads sem espera ocupada;
-- os veículos tentam ocupar a próxima célula antes de liberar a anterior;
-- a sincronização impede ocupações simultâneas e reduz o risco de deadlocks;
-- a ambulância utiliza a mesma malha, com suporte para prioridade nos
-  cruzamentos.
+```c
+typedef struct
+{
+    int id;
+    RoadDirection direction;
+    RoadType type;
 
-## Documentação complementar
+    Cell **cells;
+    Intersection **intersections;
+    int cell_count;
+} Road;
+```
+
+`ROAD_ONE_WAY` permite avanço apenas no sentido crescente dos índices da via.
+`ROAD_TWO_WAY` permite avanço nos dois sentidos na mesma faixa lógica. O
+simulador ainda não modela duas faixas físicas independentes para mão dupla.
+
+## Cruzamentos e Sinais
+
+`Intersection` é a fonte de verdade para os sinais usados pela simulação.
+
+```c
+typedef struct Intersection
+{
+    int id;
+    int row;
+    int column;
+    Road *horizontal_road;
+    Road *vertical_road;
+
+    RoadDirection green_direction;
+    RoadDirection previous_green_direction;
+    pthread_mutex_t mutex;
+    pthread_cond_t horizontal_cond;
+    pthread_cond_t vertical_cond;
+
+    int ambulance_present;
+    RoadDirection ambulance_direction;
+} Intersection;
+```
+
+Quando uma ambulância solicita prioridade, o cruzamento guarda a direção verde
+anterior, libera a direção da ambulância e restaura o ciclo normal quando a
+prioridade é limpa.
+
+O módulo `TrafficLight` permanece no projeto como componente didático, mas a
+simulação integrada usa `Intersection.green_direction`.
+
+## Relógio Global
+
+`GlobalClock.c` mantém:
+
+```c
+int global_tick;
+os_mutex_t clock_mutex;
+os_cond_t clock_cond;
+bool simulation_running;
+```
+
+A thread do relógio incrementa o tick a cada `1000 ms` e acorda as threads que
+estão esperando o próximo ciclo. O encerramento chama `stop_global_clock()`,
+faz broadcast nas condições e aguarda as threads com `join`.
+
+## Veículos
+
+Os veículos da demonstração usam `ThreadVehicle`, definido em
+`src/models/vehicle_thread.h`.
+
+O avanço integrado valida:
+
+- destino dentro do mapa;
+- movimento para célula adjacente;
+- direção do veículo compatível com a via;
+- regra de mão única;
+- sinal verde antes de entrar em cruzamento;
+- prioridade de ambulância;
+- célula de destino livre.
+
+O veículo não segura mutex de célula enquanto espera tick ou sinal. A troca de
+ocupação entre origem e destino acontece sob o mutex do mapa e os mutexes das
+células envolvidas.
+
+## Testes
+
+`make test` compila e executa:
+
+- `test_intersection_priority`: prioridade da ambulância, restauração do ciclo
+  do cruzamento e destruição de recursos;
+- `test_vehicle_invariants`: avanço sem duplicação final, bloqueio atrás de
+  veículo ocupado, mão única, mão dupla e limite do mapa.
+
+## Limitações
+
+- As rotas da demonstração são fixas no código.
+- Não há entrada por linha de comando para configurar número de veículos,
+  duração ou mapa.
+- Mão dupla ainda é uma única faixa lógica onde o sentido reverso é aceito; não
+  há duas faixas físicas independentes.
+- O renderer ASCII é uma visualização simples para debug e demonstração.
+- O projeto não roda Valgrind ou sanitizers automaticamente pelo `Makefile`.
+
+## Documentação Complementar
 
 - [Explicação do projeto](docs/explicacao_projeto.md)
 - [Divisão de tarefas](docs/tasks-division.md)

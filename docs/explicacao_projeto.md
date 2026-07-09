@@ -477,9 +477,11 @@ O fluxo atual é:
 ```text
 1. Calcular o índice da próxima célula
 2. Se for cruzamento, esperar o sinal verde
-3. Tentar ocupar a próxima célula
-4. Se conseguir, liberar a célula anterior
-5. Atualizar a posição armazenada no veículo
+3. Bloquear o estado do mapa
+4. Bloquear as células de origem e destino em ordem determinística
+5. Se o destino estiver livre, liberar a origem e ocupar o destino
+6. Liberar as células e o estado do mapa
+7. Atualizar a posição armazenada no veículo
 ```
 
 Depois:
@@ -489,12 +491,9 @@ Depois:
 ```
 
 Se B já estiver ocupada, a tentativa falha e a ambulância permanece em A.
-
-### Limitação importante
-
-O movimento “ocupa o destino e depois libera a origem”. Isso evita que o veículo desapareça caso o destino esteja ocupado, mas existe um pequeno intervalo em que ele aparece como ocupante das duas células.
-
-Para uma renderização consistente e para uma política rigorosa de movimento atômico, essa transição ainda precisa de um protocolo único de locks ou de snapshot.
+O renderer também usa o mutex de estado do mapa ao montar o snapshot de
+ocupação, então ele não deve capturar metade da transição e mostrar o mesmo
+veículo em duas células no mesmo frame.
 
 ---
 

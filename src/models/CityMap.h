@@ -14,6 +14,7 @@ typedef struct
 {
     int rows;
     int columns;
+    pthread_mutex_t state_mutex;
 
     Cell **cells;
     Road **roads;

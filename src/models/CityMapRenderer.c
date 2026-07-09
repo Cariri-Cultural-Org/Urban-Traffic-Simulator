@@ -127,6 +127,8 @@ static void overlay_occupied_cells(
     const CityMapAsciiRenderOptions *options
 )
 {
+    pthread_mutex_lock((pthread_mutex_t *)&city_map->state_mutex);
+
     for (int row = 0; row < city_map->rows; row++)
     {
         for (int column = 0; column < city_map->columns; column++)
@@ -146,6 +148,8 @@ static void overlay_occupied_cells(
             pthread_mutex_unlock(&cell->mutex);
         }
     }
+
+    pthread_mutex_unlock((pthread_mutex_t *)&city_map->state_mutex);
 }
 
 static int write_frame(

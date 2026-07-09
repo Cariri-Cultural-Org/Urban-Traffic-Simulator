@@ -9,6 +9,7 @@ CityMap *city_map_create(void)
 
     city_map->rows    = CITY_MAP_ROWS;
     city_map->columns = CITY_MAP_COLUMNS;
+    pthread_mutex_init(&city_map->state_mutex, NULL);
 
     if (!allocate_cells(city_map))
     {
@@ -38,6 +39,7 @@ void city_map_destroy(CityMap *city_map)
     if (city_map->roads)         release_roads(city_map);
     if (city_map->cells)         release_cells(city_map, city_map->rows);
 
+    pthread_mutex_destroy(&city_map->state_mutex);
     free(city_map);
 }
 
