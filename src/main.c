@@ -96,6 +96,31 @@ static void toggle_city_map_signals(CityMap *city_map)
     }
 }
 
+static const char *vehicle_type_label(VehicleType type)
+{
+    return type == VEHICLE_TYPE_AMBULANCE ? "ambulance" : "car";
+}
+
+static const char *speed_label(Speed speed)
+{
+    switch (speed)
+    {
+    case SPEED_FAST:
+        return "fast";
+    case SPEED_MEDIUM:
+        return "medium";
+    case SPEED_SLOW:
+        return "slow";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *road_direction_label(RoadDirection direction)
+{
+    return direction == ROAD_HORIZONTAL ? "horizontal" : "vertical";
+}
+
 int main(void)
 {
     CityMap *city_map;
@@ -231,6 +256,19 @@ int main(void)
             simulation_output_destroy();
             return 1;
         }
+
+        simulation_output_log(
+            "[Plan] vehicle #%d: %s | road #%d (%s) | start=%d | route=%d cells | speed=%s (%d tick%s)\n",
+            i + 1,
+            vehicle_type_label(vehicle_types[i]),
+            vehicle_roads[i]->id,
+            road_direction_label(vehicle_roads[i]->direction),
+            route_starts[i],
+            route_sizes[i],
+            speed_label(vehicle_speeds[i]),
+            (int)vehicle_speeds[i],
+            vehicle_speeds[i] == SPEED_FAST ? "" : "s"
+        );
 
         thread_vehicle_init(
             &vehicles[i],
