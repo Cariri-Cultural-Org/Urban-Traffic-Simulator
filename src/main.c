@@ -6,7 +6,7 @@
 #include "models/Road.h"
 #include "models/vehicle_thread.h"
 
-#define DEMO_ROUTE_LENGTH 10
+#define DEMO_ROUTE_LENGTH 20
 #define DEMO_VEHICLE_COUNT 10
 #define DEMO_SIMULATION_TICKS 30
 #define SIGNAL_INTERVAL_TICKS 3
