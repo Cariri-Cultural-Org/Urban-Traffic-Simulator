@@ -8,6 +8,7 @@
 
 #define DEMO_ROUTE_LENGTH 10
 #define DEMO_VEHICLE_COUNT 10
+#define DEMO_SIMULATION_TICKS 30
 #define SIGNAL_INTERVAL_TICKS 3
 
 static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
@@ -235,7 +236,7 @@ int main(void)
         return 1;
     }
 
-    for (int i = 0; i < 14; i++)
+    for (int i = 0; i < DEMO_SIMULATION_TICKS; i++)
     {
         int observed_tick = global_tick;
 
