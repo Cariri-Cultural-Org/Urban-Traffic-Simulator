@@ -1,5 +1,5 @@
 #include "GlobalClock.h"
-#define TICK_DELAY_MS 1000
+#define TICK_DELAY_MS 100
 
 int global_tick = 0;
 os_mutex_t clock_mutex;

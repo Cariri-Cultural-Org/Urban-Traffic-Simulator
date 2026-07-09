@@ -67,6 +67,11 @@ static const char *vehicle_type_to_string(VehicleType type)
     return type == VEHICLE_TYPE_AMBULANCE ? "AMBULANCE" : "CAR";
 }
 
+static const char *road_direction_to_string(RoadDirection direction)
+{
+    return direction == ROAD_HORIZONTAL ? "horizontal" : "vertical";
+}
+
 static char vehicle_type_to_symbol(VehicleType type)
 {
     return type == VEHICLE_TYPE_AMBULANCE ? 'A' : 'C';
@@ -235,6 +240,15 @@ static int wait_signal_if_needed(ThreadVehicle *vehicle, Road *road, int destina
     {
         priority_changed = intersection_request_ambulance_priority(intersection, road->direction);
 
+        simulation_output_log(
+            "[AMBULANCE #%d] priority requested at intersection #%d (%d,%d), direction=%s\n",
+            vehicle->id,
+            intersection->id,
+            intersection->row,
+            intersection->column,
+            road_direction_to_string(road->direction)
+        );
+
         if (priority_changed)
         {
             vehicle->state = VEHICLE_STATE_WAITING_SIGNAL;
@@ -290,7 +304,7 @@ static int occupy_real_cell(ThreadVehicle *vehicle, Cell *cell)
     if (!vehicle || !cell)
         return 0;
 
-    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    city_map_lock_state(vehicle->city_map);
     pthread_mutex_lock(&cell->mutex);
 
     if (!cell->occupied)
@@ -302,7 +316,7 @@ static int occupy_real_cell(ThreadVehicle *vehicle, Cell *cell)
     }
 
     pthread_mutex_unlock(&cell->mutex);
-    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
+    city_map_unlock_state(vehicle->city_map);
 
     return success;
 }
@@ -314,7 +328,7 @@ static int move_real_cell(ThreadVehicle *vehicle, Cell *origin_cell, Cell *desti
     if (!vehicle || !origin_cell || !destination_cell)
         return 0;
 
-    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    city_map_lock_state(vehicle->city_map);
     lock_cell_pair(origin_cell, destination_cell);
 
     if (origin_cell->occupied &&
@@ -332,7 +346,7 @@ static int move_real_cell(ThreadVehicle *vehicle, Cell *origin_cell, Cell *desti
     }
 
     unlock_cell_pair(origin_cell, destination_cell);
-    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
+    city_map_unlock_state(vehicle->city_map);
 
     return success;
 }
@@ -342,7 +356,7 @@ static void release_real_cell(ThreadVehicle *vehicle, Cell *cell)
     if (!vehicle || !cell)
         return;
 
-    pthread_mutex_lock(&vehicle->city_map->state_mutex);
+    city_map_lock_state(vehicle->city_map);
     pthread_mutex_lock(&cell->mutex);
 
     if (cell->vehicle == vehicle_cell_pointer(vehicle))
@@ -353,7 +367,7 @@ static void release_real_cell(ThreadVehicle *vehicle, Cell *cell)
     }
 
     pthread_mutex_unlock(&cell->mutex);
-    pthread_mutex_unlock(&vehicle->city_map->state_mutex);
+    city_map_unlock_state(vehicle->city_map);
 }
 
 static int try_move_on_city_map(ThreadVehicle *vehicle, Position destination)

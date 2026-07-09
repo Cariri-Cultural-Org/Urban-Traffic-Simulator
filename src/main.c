@@ -7,7 +7,7 @@
 #include "models/vehicle_thread.h"
 
 #define DEMO_ROUTE_LENGTH 20
-#define DEMO_VEHICLE_COUNT 10
+#define DEMO_VEHICLE_COUNT 11
 #define DEMO_SIMULATION_TICKS 30
 #define SIGNAL_INTERVAL_TICKS 3
 
@@ -132,8 +132,9 @@ int main(void)
     Position routes[DEMO_VEHICLE_COUNT][DEMO_ROUTE_LENGTH];
     Road *vehicle_roads[DEMO_VEHICLE_COUNT];
     int route_sizes[DEMO_VEHICLE_COUNT];
-    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 4, 8, 12, 16, 20, 0, 0, 0, 0};
+    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 5, 0, 5, 0, 5, 5, 0, 0, 0, 0};
     const VehicleType vehicle_types[DEMO_VEHICLE_COUNT] = {
+        VEHICLE_TYPE_CAR,
         VEHICLE_TYPE_CAR,
         VEHICLE_TYPE_CAR,
         VEHICLE_TYPE_CAR,
@@ -155,6 +156,7 @@ int main(void)
         DIRECTION_SOUTH,
         DIRECTION_SOUTH,
         DIRECTION_SOUTH,
+        DIRECTION_SOUTH,
         DIRECTION_SOUTH
     };
     const Speed vehicle_speeds[DEMO_VEHICLE_COUNT] = {
@@ -167,6 +169,7 @@ int main(void)
         SPEED_SLOW,
         SPEED_MEDIUM,
         SPEED_FAST,
+        SPEED_MEDIUM,
         SPEED_FAST
     };
     int started_vehicles = 0;
@@ -197,8 +200,7 @@ int main(void)
     simulation_output_log("Roads: %d | Intersections: %d\n",
                           city_map->road_count, city_map->intersection_count);
     simulation_output_log(
-        "Demo: %d vehicles on horizontal road #%d and vertical road #%d\n",
-        DEMO_VEHICLE_COUNT,
+        "Demo: 10 cars + 1 ambulance on horizontal road #%d and vertical road #%d\n",
         horizontal_road->id,
         vertical_road->id
     );
@@ -226,15 +228,16 @@ int main(void)
     }
 
     vehicle_roads[0] = city_map->roads[0];
-    vehicle_roads[1] = city_map->roads[1];
-    vehicle_roads[2] = city_map->roads[2];
-    vehicle_roads[3] = city_map->roads[0];
-    vehicle_roads[4] = city_map->roads[1];
+    vehicle_roads[1] = city_map->roads[0];
+    vehicle_roads[2] = city_map->roads[1];
+    vehicle_roads[3] = city_map->roads[1];
+    vehicle_roads[4] = city_map->roads[2];
     vehicle_roads[5] = city_map->roads[2];
-    vehicle_roads[6] = city_map->roads[3];
+    vehicle_roads[6] = city_map->roads[6];
     vehicle_roads[7] = city_map->roads[4];
     vehicle_roads[8] = city_map->roads[5];
     vehicle_roads[9] = city_map->roads[6];
+    vehicle_roads[10] = city_map->roads[3];
 
     for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
     {

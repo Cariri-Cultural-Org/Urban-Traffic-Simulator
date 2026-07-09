@@ -75,3 +75,19 @@ int city_map_is_valid_position(const CityMap *city_map, int row, int column)
     return row >= 0 && row < city_map->rows &&
            column >= 0 && column < city_map->columns;
 }
+
+void city_map_lock_state(CityMap *city_map)
+{
+    if (!city_map)
+        return;
+
+    pthread_mutex_lock(&city_map->state_mutex);
+}
+
+void city_map_unlock_state(CityMap *city_map)
+{
+    if (!city_map)
+        return;
+
+    pthread_mutex_unlock(&city_map->state_mutex);
+}

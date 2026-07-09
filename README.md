@@ -14,7 +14,7 @@ O `main.c` executa uma demonstração fixa com:
 - mapa de `20x40`;
 - 7 vias, sendo 3 horizontais e 4 verticais;
 - 12 cruzamentos reais;
-- 10 veículos em threads, incluindo uma ambulância;
+- 10 carros comuns e 1 ambulância em threads;
 - velocidades de 1, 2 e 4 ticks;
 - alternância dos cruzamentos a cada 3 ticks;
 - encerramento com `stop`, `broadcast`, `join` e destruição dos recursos.
@@ -81,6 +81,7 @@ MinGW no Windows.
 │       ├── city_map_utils.c
 │       └── vehicle_thread.c
 ├── tests/
+│   ├── test_city_map_renderer.c
 │   ├── test_intersection_priority.c
 │   └── test_vehicle_invariants.c
 ├── Makefile
@@ -151,9 +152,10 @@ typedef struct
 Cada célula possui um mutex próprio para proteger ocupação, liberação, símbolo
 renderizado e ponteiro do ocupante.
 
-O movimento em `vehicle_thread.c` usa também `CityMap.state_mutex` para impedir
-que o renderer leia um frame no meio da troca entre célula de origem e célula
-de destino. Assim, um frame não deve mostrar o mesmo veículo em duas posições.
+O movimento em `vehicle_thread.c` usa também a API `city_map_lock_state()` /
+`city_map_unlock_state()` para impedir que o renderer leia um frame no meio da
+troca entre célula de origem e célula de destino. Assim, um frame não deve
+mostrar o mesmo veículo em duas posições.
 
 ## Vias
 
@@ -206,6 +208,10 @@ prioridade é limpa.
 
 O módulo `TrafficLight` permanece no projeto como componente didático, mas a
 simulação integrada usa `Intersection.green_direction`.
+
+O módulo `Ambulance.c` também permanece como caminho legado/didático. A
+simulação principal usa a ambulância integrada em `vehicle_thread.c` com
+`VEHICLE_TYPE_AMBULANCE`.
 
 ## Relógio Global
 

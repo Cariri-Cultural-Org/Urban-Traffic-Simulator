@@ -25,9 +25,9 @@ typedef struct
 
 extern const CityMapAsciiRenderOptions CITY_MAP_ASCII_RENDER_DEFAULT_OPTIONS;
 
-int city_map_render_ascii(const CityMap *city_map, FILE *stream, int tick);
+int city_map_render_ascii(CityMap *city_map, FILE *stream, int tick);
 int city_map_render_ascii_with_options(
-    const CityMap *city_map,
+    CityMap *city_map,
     FILE *stream,
     int tick,
     const CityMapAsciiRenderOptions *options

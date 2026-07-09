@@ -42,7 +42,7 @@ void simulation_output_log(const char *format, ...)
         pthread_mutex_unlock(&output_mutex);
 }
 
-int simulation_output_render_city_map(const CityMap *city_map, FILE *stream, int tick)
+int simulation_output_render_city_map(CityMap *city_map, FILE *stream, int tick)
 {
     int result;
 

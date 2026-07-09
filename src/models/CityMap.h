@@ -29,5 +29,7 @@ void city_map_destroy(CityMap *city_map);
 Cell *city_map_get_cell(const CityMap *city_map, int row, int column);
 Intersection *city_map_get_intersection(const CityMap *city_map, int row, int column);
 int city_map_is_valid_position(const CityMap *city_map, int row, int column);
+void city_map_lock_state(CityMap *city_map);
+void city_map_unlock_state(CityMap *city_map);
 
 #endif

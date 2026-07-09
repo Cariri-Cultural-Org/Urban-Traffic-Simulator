@@ -123,11 +123,11 @@ static char occupied_symbol(
 
 static void overlay_occupied_cells(
     char *grid,
-    const CityMap *city_map,
+    CityMap *city_map,
     const CityMapAsciiRenderOptions *options
 )
 {
-    pthread_mutex_lock((pthread_mutex_t *)&city_map->state_mutex);
+    city_map_lock_state(city_map);
 
     for (int row = 0; row < city_map->rows; row++)
     {
@@ -149,7 +149,7 @@ static void overlay_occupied_cells(
         }
     }
 
-    pthread_mutex_unlock((pthread_mutex_t *)&city_map->state_mutex);
+    city_map_unlock_state(city_map);
 }
 
 static int write_frame(
@@ -190,7 +190,7 @@ static int write_frame(
     return fflush(stream) == 0;
 }
 
-int city_map_render_ascii(const CityMap *city_map, FILE *stream, int tick)
+int city_map_render_ascii(CityMap *city_map, FILE *stream, int tick)
 {
     return city_map_render_ascii_with_options(
         city_map,
@@ -201,7 +201,7 @@ int city_map_render_ascii(const CityMap *city_map, FILE *stream, int tick)
 }
 
 int city_map_render_ascii_with_options(
-    const CityMap *city_map,
+    CityMap *city_map,
     FILE *stream,
     int tick,
     const CityMapAsciiRenderOptions *options
