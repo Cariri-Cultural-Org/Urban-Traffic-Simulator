@@ -85,15 +85,17 @@ void intersection_toggle_signal(Intersection *intersection)
 
 void intersection_wait_green(Intersection *intersection, RoadDirection road_direction)
 {
+    const unsigned int wait_slice_ms = 100;
+
     if (road_direction == ROAD_HORIZONTAL)
     {
         while (simulation_running && !intersection_direction_is_open_locked(intersection, ROAD_HORIZONTAL))
-            pthread_cond_wait(&intersection->horizontal_cond, &intersection->mutex);
+            pthread_cond_timedwait_ms(&intersection->horizontal_cond, &intersection->mutex, wait_slice_ms);
     }
     else
     {
         while (simulation_running && !intersection_direction_is_open_locked(intersection, ROAD_VERTICAL))
-            pthread_cond_wait(&intersection->vertical_cond, &intersection->mutex);
+            pthread_cond_timedwait_ms(&intersection->vertical_cond, &intersection->mutex, wait_slice_ms);
     }
 }
 

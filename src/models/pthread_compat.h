@@ -71,6 +71,14 @@ static inline int pthread_cond_wait(pthread_cond_t *condition, pthread_mutex_t *
     return SleepConditionVariableCS(condition, mutex, INFINITE) ? 0 : 1;
 }
 
+static inline int pthread_cond_timedwait_ms(
+    pthread_cond_t *condition,
+    pthread_mutex_t *mutex,
+    unsigned int timeout_ms)
+{
+    return SleepConditionVariableCS(condition, mutex, timeout_ms) ? 0 : 1;
+}
+
 static inline int pthread_cond_broadcast(pthread_cond_t *condition)
 {
     WakeAllConditionVariable(condition);
@@ -116,6 +124,29 @@ static inline int pthread_join(pthread_t thread, void **result)
 
 #else
 #include <pthread.h>
+#include <sys/time.h>
+
+static inline int pthread_cond_timedwait_ms(
+    pthread_cond_t *condition,
+    pthread_mutex_t *mutex,
+    unsigned int timeout_ms)
+{
+    struct timeval now;
+    struct timespec deadline;
+
+    gettimeofday(&now, NULL);
+
+    deadline.tv_sec = now.tv_sec + (timeout_ms / 1000);
+    deadline.tv_nsec = (now.tv_usec * 1000L) + ((timeout_ms % 1000) * 1000000L);
+
+    if (deadline.tv_nsec >= 1000000000L)
+    {
+        deadline.tv_sec++;
+        deadline.tv_nsec -= 1000000000L;
+    }
+
+    return pthread_cond_timedwait(condition, mutex, &deadline);
+}
 #endif
 
 #endif

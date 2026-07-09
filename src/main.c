@@ -204,6 +204,7 @@ int main(void)
     {
         simulation_output_log("ERROR: failed to start vehicle threads.\n");
         stop_global_clock();
+        city_map_broadcast_intersections(city_map);
 
         for (int i = 0; i < started_vehicles; i++)
             thread_vehicle_join(&vehicles[i]);
