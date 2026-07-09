@@ -7,7 +7,7 @@
 #include "models/vehicle_thread.h"
 
 #define DEMO_ROUTE_LENGTH 10
-#define DEMO_VEHICLE_COUNT 3
+#define DEMO_VEHICLE_COUNT 10
 #define SIGNAL_INTERVAL_TICKS 3
 
 static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
@@ -95,9 +95,45 @@ int main(void)
     os_thread_t clock_thread;
     os_thread_t test_thread;
     ThreadVehicle vehicles[DEMO_VEHICLE_COUNT];
-    Position slow_car_route[DEMO_ROUTE_LENGTH];
-    Position fast_car_route[DEMO_ROUTE_LENGTH];
-    Position ambulance_route[DEMO_ROUTE_LENGTH];
+    Position routes[DEMO_VEHICLE_COUNT][DEMO_ROUTE_LENGTH];
+    const Road *vehicle_roads[DEMO_VEHICLE_COUNT];
+    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 3, 6, 9, 12, 15, 1, 3, 5, 7};
+    const VehicleType vehicle_types[DEMO_VEHICLE_COUNT] = {
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_CAR,
+        VEHICLE_TYPE_AMBULANCE
+    };
+    const Direction vehicle_directions[DEMO_VEHICLE_COUNT] = {
+        DIRECTION_EAST,
+        DIRECTION_EAST,
+        DIRECTION_EAST,
+        DIRECTION_EAST,
+        DIRECTION_EAST,
+        DIRECTION_EAST,
+        DIRECTION_SOUTH,
+        DIRECTION_SOUTH,
+        DIRECTION_SOUTH,
+        DIRECTION_SOUTH
+    };
+    const Speed vehicle_speeds[DEMO_VEHICLE_COUNT] = {
+        SPEED_SLOW,
+        SPEED_FAST,
+        SPEED_MEDIUM,
+        SPEED_SLOW,
+        SPEED_FAST,
+        SPEED_MEDIUM,
+        SPEED_SLOW,
+        SPEED_MEDIUM,
+        SPEED_FAST,
+        SPEED_FAST
+    };
     int started_vehicles = 0;
 
     simulation_output_init();
@@ -126,7 +162,8 @@ int main(void)
     simulation_output_log("Roads: %d | Intersections: %d\n",
                           city_map->road_count, city_map->intersection_count);
     simulation_output_log(
-        "Demo: two cars on horizontal road #%d and ambulance on vertical road #%d\n",
+        "Demo: %d vehicles on horizontal road #%d and vertical road #%d\n",
+        DEMO_VEHICLE_COUNT,
         horizontal_road->id,
         vertical_road->id
     );
@@ -153,46 +190,28 @@ int main(void)
         return 1;
     }
 
-    // probably wrong, the car need to synchronize with clock tick
-    build_route_from_road(horizontal_road, 2, fast_car_route, DEMO_ROUTE_LENGTH);
-    build_route_from_road(horizontal_road, 0, slow_car_route, DEMO_ROUTE_LENGTH);
-    build_route_from_road(vertical_road, 1, ambulance_route, DEMO_ROUTE_LENGTH);
+    for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
+    {
+        vehicle_roads[i] = i < 6 ? horizontal_road : vertical_road;
+        build_route_from_road(
+            vehicle_roads[i],
+            route_starts[i],
+            routes[i],
+            DEMO_ROUTE_LENGTH
+        );
 
-    thread_vehicle_init(
-        &vehicles[0],
-        1,
-        VEHICLE_TYPE_CAR,
-        slow_car_route[0],
-        DIRECTION_EAST,
-        SPEED_SLOW,
-        slow_car_route,
-        DEMO_ROUTE_LENGTH
-    );
-    thread_vehicle_attach_city_map(&vehicles[0], city_map);
-
-    thread_vehicle_init(
-        &vehicles[1],
-        2,
-        VEHICLE_TYPE_CAR,
-        fast_car_route[0],
-        DIRECTION_EAST,
-        SPEED_FAST,
-        fast_car_route,
-        DEMO_ROUTE_LENGTH
-    );
-    thread_vehicle_attach_city_map(&vehicles[1], city_map);
-
-    thread_vehicle_init(
-        &vehicles[2],
-        3,
-        VEHICLE_TYPE_AMBULANCE,
-        ambulance_route[0],
-        DIRECTION_SOUTH,
-        SPEED_FAST,
-        ambulance_route,
-        DEMO_ROUTE_LENGTH
-    );
-    thread_vehicle_attach_city_map(&vehicles[2], city_map);
+        thread_vehicle_init(
+            &vehicles[i],
+            i + 1,
+            vehicle_types[i],
+            routes[i][0],
+            vehicle_directions[i],
+            vehicle_speeds[i],
+            routes[i],
+            DEMO_ROUTE_LENGTH
+        );
+        thread_vehicle_attach_city_map(&vehicles[i], city_map);
+    }
 
     for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
     {
