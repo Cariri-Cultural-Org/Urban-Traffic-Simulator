@@ -28,7 +28,7 @@ void cell_release_position(Position position)
 
 void wait_tick(void)
 {
-    int current_tick = global_tick;
+    int current_tick = global_clock_current_tick();
     wait_next_tick(current_tick);
 }
 

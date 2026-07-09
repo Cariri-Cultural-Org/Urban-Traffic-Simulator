@@ -14,9 +14,11 @@ O `main.c` executa uma demonstração fixa com:
 - mapa de `20x40`;
 - 7 vias, sendo 3 horizontais e 4 verticais;
 - 12 cruzamentos reais;
-- 10 carros comuns e 1 ambulância em threads;
+- 15 carros comuns e 3 ambulâncias em threads;
+- duração de cerca de 1 minuto, com 60 ticks de 1 segundo;
 - velocidades de 1, 2 e 4 ticks;
 - alternância dos cruzamentos a cada 3 ticks;
+- terminal dedicado aos frames do mapa com legenda, sem logs de movimento durante a demo;
 - encerramento com `stop`, `broadcast`, `join` e destruição dos recursos.
 
 O binário gerado é:
@@ -255,6 +257,7 @@ células envolvidas.
   do cruzamento e destruição de recursos;
 - `test_vehicle_invariants`: avanço sem duplicação final, bloqueio atrás de
   veículo ocupado, mão única, mão dupla e limite do mapa.
+- `test_city_map_renderer`: formato básico do frame ASCII e símbolos do mapa.
 
 ## Limitações
 

@@ -19,7 +19,7 @@ static int ambulance_place_initially(Vehicle *ambulance)
             return 1;
         }
 
-        wait_next_tick(global_tick);
+        wait_next_tick(global_clock_current_tick());
     }
 
     return 0;
@@ -39,13 +39,13 @@ void *thread_ambulance(void *arg)
     if (!ambulance_place_initially(ambulance))
         return 0;
 
-    int last_tick = global_tick;
+    int last_tick = global_clock_current_tick();
 
     while (simulation_running && ambulance->active)
     {
         // Aguarda a sincronização do relógio global (sem busy-wait)
         wait_next_tick(last_tick);
-        last_tick = global_tick;
+        last_tick = global_clock_current_tick();
 
         if (!simulation_running || !ambulance->active)
         {
@@ -85,7 +85,7 @@ void *thread_ambulance(void *arg)
                 if (priority_changed)
                 {
                     wait_next_tick(last_tick);
-                    last_tick = global_tick;
+                    last_tick = global_clock_current_tick();
 
                     if (!simulation_running || !ambulance->active)
                     {

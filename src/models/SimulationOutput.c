@@ -7,6 +7,7 @@
 
 static pthread_mutex_t output_mutex;
 static int output_initialized = 0;
+static int log_enabled = 1;
 
 void simulation_output_init(void)
 {
@@ -26,9 +27,17 @@ void simulation_output_destroy(void)
     output_initialized = 0;
 }
 
+void simulation_output_set_log_enabled(int enabled)
+{
+    log_enabled = enabled;
+}
+
 void simulation_output_log(const char *format, ...)
 {
     va_list args;
+
+    if (!log_enabled)
+        return;
 
     if (output_initialized)
         pthread_mutex_lock(&output_mutex);
@@ -44,12 +53,15 @@ void simulation_output_log(const char *format, ...)
 
 int simulation_output_render_city_map(CityMap *city_map, FILE *stream, int tick)
 {
+    CityMapAsciiRenderOptions options = CITY_MAP_ASCII_RENDER_DEFAULT_OPTIONS;
     int result;
+
+    options.show_tick = 1;
 
     if (output_initialized)
         pthread_mutex_lock(&output_mutex);
 
-    result = city_map_render_ascii(city_map, stream, tick);
+    result = city_map_render_ascii_with_options(city_map, stream, tick, &options);
 
     if (output_initialized)
         pthread_mutex_unlock(&output_mutex);

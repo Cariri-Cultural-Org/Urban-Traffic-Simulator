@@ -6,10 +6,42 @@
 #include "models/Road.h"
 #include "models/vehicle_thread.h"
 
-#define DEMO_ROUTE_LENGTH 20
-#define DEMO_VEHICLE_COUNT 11
-#define DEMO_SIMULATION_TICKS 30
+#define DEMO_ROUTE_LENGTH 40
+#define DEMO_CAR_COUNT 15
+#define DEMO_AMBULANCE_COUNT 3
+#define DEMO_VEHICLE_COUNT (DEMO_CAR_COUNT + DEMO_AMBULANCE_COUNT)
+#define DEMO_SIMULATION_TICKS 60
 #define SIGNAL_INTERVAL_TICKS 3
+
+typedef struct
+{
+    int road_index;
+    int start_index;
+    VehicleType type;
+    Direction direction;
+    Speed speed;
+} DemoVehiclePlan;
+
+static const DemoVehiclePlan DEMO_VEHICLE_PLANS[DEMO_VEHICLE_COUNT] = {
+    {0, 0, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_SLOW},
+    {0, 5, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_MEDIUM},
+    {0, 10, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_FAST},
+    {1, 0, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_SLOW},
+    {1, 5, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_FAST},
+    {1, 10, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_MEDIUM},
+    {1, 15, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_SLOW},
+    {2, 0, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_FAST},
+    {2, 6, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_MEDIUM},
+    {2, 12, VEHICLE_TYPE_CAR, DIRECTION_EAST, SPEED_SLOW},
+    {3, 0, VEHICLE_TYPE_CAR, DIRECTION_SOUTH, SPEED_MEDIUM},
+    {3, 5, VEHICLE_TYPE_CAR, DIRECTION_SOUTH, SPEED_SLOW},
+    {4, 0, VEHICLE_TYPE_CAR, DIRECTION_SOUTH, SPEED_FAST},
+    {5, 0, VEHICLE_TYPE_CAR, DIRECTION_SOUTH, SPEED_MEDIUM},
+    {5, 5, VEHICLE_TYPE_CAR, DIRECTION_SOUTH, SPEED_SLOW},
+    {6, 0, VEHICLE_TYPE_AMBULANCE, DIRECTION_SOUTH, SPEED_FAST},
+    {4, 5, VEHICLE_TYPE_AMBULANCE, DIRECTION_SOUTH, SPEED_MEDIUM},
+    {0, 15, VEHICLE_TYPE_AMBULANCE, DIRECTION_EAST, SPEED_FAST}
+};
 
 static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
 {
@@ -20,8 +52,7 @@ static Road *find_demo_road(CityMap *city_map, RoadDirection direction)
     {
         Road *road = city_map->roads[i];
 
-        if (road && road->direction == direction &&
-            road->cell_count >= DEMO_ROUTE_LENGTH)
+        if (road && road->direction == direction && road->cell_count > 0)
         {
             return road;
         }
@@ -61,27 +92,6 @@ static int build_route_from_road(
         route[i] = position_from_road_cell(road, start_index + i);
 
     return route_size;
-}
-
-static void *clock_test_thread(void *arg)
-{
-    (void)arg;
-
-    int observed_tick = global_tick;
-
-    while (simulation_running)
-    {
-        wait_next_tick(observed_tick);
-
-        if (!simulation_running)
-            break;
-
-        observed_tick = global_tick;
-        simulation_output_log("[Test] waited tick %d and continued\n", observed_tick);
-    }
-
-    simulation_output_log("[Test] finished with global clock\n");
-    return NULL;
 }
 
 static void toggle_city_map_signals(CityMap *city_map)
@@ -127,54 +137,13 @@ int main(void)
     Road *horizontal_road;
     Road *vertical_road;
     os_thread_t clock_thread;
-    os_thread_t test_thread;
     ThreadVehicle vehicles[DEMO_VEHICLE_COUNT];
     Position routes[DEMO_VEHICLE_COUNT][DEMO_ROUTE_LENGTH];
-    Road *vehicle_roads[DEMO_VEHICLE_COUNT];
     int route_sizes[DEMO_VEHICLE_COUNT];
-    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 5, 0, 5, 0, 5, 5, 0, 0, 0, 0};
-    const VehicleType vehicle_types[DEMO_VEHICLE_COUNT] = {
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_CAR,
-        VEHICLE_TYPE_AMBULANCE
-    };
-    const Direction vehicle_directions[DEMO_VEHICLE_COUNT] = {
-        DIRECTION_EAST,
-        DIRECTION_EAST,
-        DIRECTION_EAST,
-        DIRECTION_EAST,
-        DIRECTION_EAST,
-        DIRECTION_EAST,
-        DIRECTION_SOUTH,
-        DIRECTION_SOUTH,
-        DIRECTION_SOUTH,
-        DIRECTION_SOUTH,
-        DIRECTION_SOUTH
-    };
-    const Speed vehicle_speeds[DEMO_VEHICLE_COUNT] = {
-        SPEED_SLOW,
-        SPEED_FAST,
-        SPEED_MEDIUM,
-        SPEED_SLOW,
-        SPEED_FAST,
-        SPEED_MEDIUM,
-        SPEED_SLOW,
-        SPEED_MEDIUM,
-        SPEED_FAST,
-        SPEED_MEDIUM,
-        SPEED_FAST
-    };
     int started_vehicles = 0;
 
     simulation_output_init();
+    simulation_output_set_log_enabled(0);
     simulation_output_log("--- Starting the Urban Traffic Simulator ---\n");
 
     city_map = city_map_create();
@@ -200,7 +169,9 @@ int main(void)
     simulation_output_log("Roads: %d | Intersections: %d\n",
                           city_map->road_count, city_map->intersection_count);
     simulation_output_log(
-        "Demo: 10 cars + 1 ambulance on horizontal road #%d and vertical road #%d\n",
+        "Demo: %d cars + %d ambulances on horizontal road #%d and vertical road #%d\n",
+        DEMO_CAR_COUNT,
+        DEMO_AMBULANCE_COUNT,
         horizontal_road->id,
         vertical_road->id
     );
@@ -216,34 +187,25 @@ int main(void)
         return 1;
     }
 
-    if (pthread_create(&test_thread, NULL, clock_test_thread, NULL) != 0)
-    {
-        simulation_output_log("ERROR: failed to start clock test thread.\n");
-        stop_global_clock();
-        pthread_join(clock_thread, NULL);
-        destroy_global_clock();
-        city_map_destroy(city_map);
-        simulation_output_destroy();
-        return 1;
-    }
-
-    vehicle_roads[0] = city_map->roads[0];
-    vehicle_roads[1] = city_map->roads[0];
-    vehicle_roads[2] = city_map->roads[1];
-    vehicle_roads[3] = city_map->roads[1];
-    vehicle_roads[4] = city_map->roads[2];
-    vehicle_roads[5] = city_map->roads[2];
-    vehicle_roads[6] = city_map->roads[6];
-    vehicle_roads[7] = city_map->roads[4];
-    vehicle_roads[8] = city_map->roads[5];
-    vehicle_roads[9] = city_map->roads[6];
-    vehicle_roads[10] = city_map->roads[3];
-
     for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
     {
+        const DemoVehiclePlan *plan = &DEMO_VEHICLE_PLANS[i];
+        Road *vehicle_road = city_map->roads[plan->road_index];
+
+        if (!vehicle_road)
+        {
+            simulation_output_log("ERROR: road unavailable for vehicle #%d.\n", i + 1);
+            stop_global_clock();
+            pthread_join(clock_thread, NULL);
+            destroy_global_clock();
+            city_map_destroy(city_map);
+            simulation_output_destroy();
+            return 1;
+        }
+
         route_sizes[i] = build_route_from_road(
-            vehicle_roads[i],
-            route_starts[i],
+            vehicle_road,
+            plan->start_index,
             routes[i],
             DEMO_ROUTE_LENGTH
         );
@@ -252,7 +214,6 @@ int main(void)
         {
             simulation_output_log("ERROR: failed to build route for vehicle #%d.\n", i + 1);
             stop_global_clock();
-            pthread_join(test_thread, NULL);
             pthread_join(clock_thread, NULL);
             destroy_global_clock();
             city_map_destroy(city_map);
@@ -263,23 +224,23 @@ int main(void)
         simulation_output_log(
             "[Plan] vehicle #%d: %s | road #%d (%s) | start=%d | route=%d cells | speed=%s (%d tick%s)\n",
             i + 1,
-            vehicle_type_label(vehicle_types[i]),
-            vehicle_roads[i]->id,
-            road_direction_label(vehicle_roads[i]->direction),
-            route_starts[i],
+            vehicle_type_label(plan->type),
+            vehicle_road->id,
+            road_direction_label(vehicle_road->direction),
+            plan->start_index,
             route_sizes[i],
-            speed_label(vehicle_speeds[i]),
-            (int)vehicle_speeds[i],
-            vehicle_speeds[i] == SPEED_FAST ? "" : "s"
+            speed_label(plan->speed),
+            (int)plan->speed,
+            plan->speed == SPEED_FAST ? "" : "s"
         );
 
         thread_vehicle_init(
             &vehicles[i],
             i + 1,
-            vehicle_types[i],
+            plan->type,
             routes[i][0],
-            vehicle_directions[i],
-            vehicle_speeds[i],
+            plan->direction,
+            plan->speed,
             routes[i],
             route_sizes[i]
         );
@@ -301,7 +262,6 @@ int main(void)
         for (int i = 0; i < started_vehicles; i++)
             thread_vehicle_join(&vehicles[i]);
 
-        pthread_join(test_thread, NULL);
         pthread_join(clock_thread, NULL);
         destroy_global_clock();
         city_map_destroy(city_map);
@@ -309,18 +269,23 @@ int main(void)
         return 1;
     }
 
-    for (int i = 0; i < DEMO_SIMULATION_TICKS; i++)
+    int rendered_tick = global_clock_current_tick();
+    int target_tick = rendered_tick + DEMO_SIMULATION_TICKS;
+
+    while (rendered_tick < target_tick)
     {
-        int observed_tick = global_tick;
+        int observed_tick = rendered_tick;
 
         wait_next_tick(observed_tick);
-        if (global_tick % SIGNAL_INTERVAL_TICKS == 0)
+        rendered_tick = global_clock_current_tick();
+
+        if (rendered_tick % SIGNAL_INTERVAL_TICKS == 0)
             toggle_city_map_signals(city_map);
 
-        // printf("\033[H\033[J");
+        printf("\033[H\033[J");
         fflush(stdout);
 
-        if (!simulation_output_render_city_map(city_map, stdout, global_tick))
+        if (!simulation_output_render_city_map(city_map, stdout, rendered_tick))
         {
             simulation_output_log("ERROR: failed to render ASCII map.\n");
             break;
@@ -333,7 +298,6 @@ int main(void)
 
     for (int i = 0; i < started_vehicles; i++)
         thread_vehicle_join(&vehicles[i]);
-    pthread_join(test_thread, NULL);
     pthread_join(clock_thread, NULL);
 
     destroy_global_clock();

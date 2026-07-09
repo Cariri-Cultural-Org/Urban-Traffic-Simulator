@@ -7,6 +7,7 @@
 
 void simulation_output_init(void);
 void simulation_output_destroy(void);
+void simulation_output_set_log_enabled(int enabled);
 void simulation_output_log(const char *format, ...);
 int simulation_output_render_city_map(CityMap *city_map, FILE *stream, int tick);
 

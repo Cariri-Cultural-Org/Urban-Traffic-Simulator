@@ -28,6 +28,9 @@ void *thread_global_clock(void *arg);
 // Funcao para uma thread aguardar ate o proximo tick
 void wait_next_tick(int current_tick);
 
+// Retorna o tick atual protegido pelo mutex do relógio
+int global_clock_current_tick(void);
+
 // Solicita encerramento e acorda qualquer thread bloqueada no relogio
 void stop_global_clock(void);
 
