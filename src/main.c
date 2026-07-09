@@ -44,15 +44,23 @@ static Position position_from_road_cell(const Road *road, int index)
     return position;
 }
 
-static void build_route_from_road(
+static int build_route_from_road(
     const Road *road,
     int start_index,
     Position route[],
     int route_size
 )
 {
+    if (!road || !route || start_index < 0 || start_index >= road->cell_count)
+        return 0;
+
+    if (route_size > road->cell_count - start_index)
+        route_size = road->cell_count - start_index;
+
     for (int i = 0; i < route_size; i++)
         route[i] = position_from_road_cell(road, start_index + i);
+
+    return route_size;
 }
 
 static void *clock_test_thread(void *arg)
@@ -97,8 +105,9 @@ int main(void)
     os_thread_t test_thread;
     ThreadVehicle vehicles[DEMO_VEHICLE_COUNT];
     Position routes[DEMO_VEHICLE_COUNT][DEMO_ROUTE_LENGTH];
-    const Road *vehicle_roads[DEMO_VEHICLE_COUNT];
-    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 3, 6, 9, 12, 15, 1, 3, 5, 7};
+    Road *vehicle_roads[DEMO_VEHICLE_COUNT];
+    int route_sizes[DEMO_VEHICLE_COUNT];
+    const int route_starts[DEMO_VEHICLE_COUNT] = {0, 4, 8, 12, 16, 20, 0, 0, 0, 0};
     const VehicleType vehicle_types[DEMO_VEHICLE_COUNT] = {
         VEHICLE_TYPE_CAR,
         VEHICLE_TYPE_CAR,
@@ -191,15 +200,37 @@ int main(void)
         return 1;
     }
 
+    vehicle_roads[0] = city_map->roads[0];
+    vehicle_roads[1] = city_map->roads[1];
+    vehicle_roads[2] = city_map->roads[2];
+    vehicle_roads[3] = city_map->roads[0];
+    vehicle_roads[4] = city_map->roads[1];
+    vehicle_roads[5] = city_map->roads[2];
+    vehicle_roads[6] = city_map->roads[3];
+    vehicle_roads[7] = city_map->roads[4];
+    vehicle_roads[8] = city_map->roads[5];
+    vehicle_roads[9] = city_map->roads[6];
+
     for (int i = 0; i < DEMO_VEHICLE_COUNT; i++)
     {
-        vehicle_roads[i] = i < 6 ? horizontal_road : vertical_road;
-        build_route_from_road(
+        route_sizes[i] = build_route_from_road(
             vehicle_roads[i],
             route_starts[i],
             routes[i],
             DEMO_ROUTE_LENGTH
         );
+
+        if (route_sizes[i] <= 0)
+        {
+            simulation_output_log("ERROR: failed to build route for vehicle #%d.\n", i + 1);
+            stop_global_clock();
+            pthread_join(test_thread, NULL);
+            pthread_join(clock_thread, NULL);
+            destroy_global_clock();
+            city_map_destroy(city_map);
+            simulation_output_destroy();
+            return 1;
+        }
 
         thread_vehicle_init(
             &vehicles[i],
@@ -209,7 +240,7 @@ int main(void)
             vehicle_directions[i],
             vehicle_speeds[i],
             routes[i],
-            DEMO_ROUTE_LENGTH
+            route_sizes[i]
         );
         thread_vehicle_attach_city_map(&vehicles[i], city_map);
     }
