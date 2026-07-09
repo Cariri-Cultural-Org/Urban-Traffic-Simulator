@@ -3,6 +3,17 @@
 #include "Intersection.h"
 #include "Road.h"
 
+static int intersection_direction_is_open_locked(
+    const Intersection *intersection,
+    RoadDirection road_direction
+)
+{
+    if (intersection->ambulance_present)
+        return road_direction == intersection->ambulance_direction;
+
+    return road_direction == intersection->green_direction;
+}
+
 Intersection *intersection_create(int id, int row, int column, Road *horizontal_road, Road *vertical_road)
 {
     Intersection *intersection = malloc(sizeof(Intersection));
@@ -76,12 +87,12 @@ void intersection_wait_green(Intersection *intersection, RoadDirection road_dire
 {
     if (road_direction == ROAD_HORIZONTAL)
     {
-        while (simulation_running && intersection->green_direction != ROAD_HORIZONTAL)
+        while (simulation_running && !intersection_direction_is_open_locked(intersection, ROAD_HORIZONTAL))
             pthread_cond_wait(&intersection->horizontal_cond, &intersection->mutex);
     }
     else
     {
-        while (simulation_running && intersection->green_direction != ROAD_VERTICAL)
+        while (simulation_running && !intersection_direction_is_open_locked(intersection, ROAD_VERTICAL))
             pthread_cond_wait(&intersection->vertical_cond, &intersection->mutex);
     }
 }
