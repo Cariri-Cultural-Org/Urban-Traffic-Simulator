@@ -6,6 +6,13 @@
 
 static int failures = 0;
 
+typedef struct
+{
+    Intersection *intersection;
+    RoadDirection direction;
+    int result;
+} PriorityRequest;
+
 #define ASSERT_TRUE(condition)                                                   \
     do                                                                          \
     {                                                                           \
@@ -15,6 +22,17 @@ static int failures = 0;
             failures++;                                                         \
         }                                                                       \
     } while (0)
+
+static void *request_priority(void *arg)
+{
+    PriorityRequest *request = (PriorityRequest *)arg;
+
+    request->result = intersection_request_ambulance_priority(
+        request->intersection,
+        request->direction
+    );
+    return NULL;
+}
 
 static void test_priority_clear_restores_previous_signal_and_cycle(void)
 {
@@ -90,6 +108,72 @@ static void test_priority_holds_signal_until_clear(void)
     intersection_destroy(intersection);
 }
 
+static void test_signal_toggle_is_deferred_during_crossing(void)
+{
+    Intersection *intersection = intersection_create(4, 10, 8, NULL, NULL);
+
+    ASSERT_TRUE(intersection != NULL);
+    if (!intersection)
+        return;
+
+    pthread_mutex_lock(&intersection->mutex);
+    intersection->crossing_occupied = 1;
+    intersection->crossing_direction = ROAD_HORIZONTAL;
+    pthread_mutex_unlock(&intersection->mutex);
+
+    intersection_toggle_signal(intersection);
+    ASSERT_TRUE(intersection->green_direction == ROAD_HORIZONTAL);
+
+    intersection_finish_crossing(intersection, 0);
+    intersection_toggle_signal(intersection);
+    ASSERT_TRUE(intersection->green_direction == ROAD_VERTICAL);
+
+    intersection_destroy(intersection);
+}
+
+static void test_conflicting_priority_waits_for_crossing_to_finish(void)
+{
+    Intersection *intersection = intersection_create(5, 10, 16, NULL, NULL);
+    PriorityRequest request = {intersection, ROAD_VERTICAL, 0};
+    pthread_t request_thread;
+    int create_result;
+
+    ASSERT_TRUE(intersection != NULL);
+    if (!intersection)
+        return;
+
+    pthread_mutex_lock(&intersection->mutex);
+    intersection->crossing_occupied = 1;
+    intersection->crossing_direction = ROAD_HORIZONTAL;
+    pthread_mutex_unlock(&intersection->mutex);
+
+    create_result = pthread_create(&request_thread, NULL, request_priority, &request);
+    ASSERT_TRUE(create_result == 0);
+    if (create_result != 0)
+    {
+        intersection_finish_crossing(intersection, 0);
+        intersection_destroy(intersection);
+        return;
+    }
+
+    thread_sleep_ms(50);
+
+    pthread_mutex_lock(&intersection->mutex);
+    ASSERT_TRUE(intersection->green_direction == ROAD_HORIZONTAL);
+    ASSERT_TRUE(intersection->ambulance_present == 0);
+    pthread_mutex_unlock(&intersection->mutex);
+
+    intersection_finish_crossing(intersection, 0);
+    pthread_join(request_thread, NULL);
+
+    ASSERT_TRUE(request.result == 1);
+    ASSERT_TRUE(intersection->ambulance_present == 1);
+    ASSERT_TRUE(intersection->green_direction == ROAD_VERTICAL);
+
+    intersection_clear_ambulance_priority(intersection);
+    intersection_destroy(intersection);
+}
+
 static void test_city_map_intersections_can_be_released_before_destroy(void)
 {
     CityMap *city_map = city_map_create();
@@ -129,6 +213,8 @@ int main(void)
     test_priority_clear_restores_previous_signal_and_cycle();
     test_priority_clear_keeps_cycle_when_signal_was_already_open();
     test_priority_holds_signal_until_clear();
+    test_signal_toggle_is_deferred_during_crossing();
+    test_conflicting_priority_waits_for_crossing_to_finish();
     test_city_map_intersections_can_be_released_before_destroy();
     test_city_map_create_destroy_repeatedly();
 

@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "models/CityMap.h"
 #include "models/Road.h"
+#include "models/SimulationOutput.h"
 #include "models/vehicle_thread.h"
 
 static int failures = 0;
@@ -189,6 +191,54 @@ static void test_vehicle_cannot_move_outside_map_bounds(void)
     city_map_destroy(city_map);
 }
 
+static void test_ambulance_priority_is_written_to_log_file(void)
+{
+    const char *log_path = "bin/test-simulation.log";
+    CityMap *city_map = city_map_create();
+    Road *road = city_map->roads[0];
+    Position route[2] = {road_position(road, 7), road_position(road, 8)};
+    ThreadVehicle ambulance;
+    char output[1024] = {0};
+    FILE *stream;
+    size_t bytes_read;
+
+    simulation_output_init();
+    ASSERT_TRUE(simulation_output_set_log_file(log_path) == 1);
+
+    thread_vehicle_init(
+        &ambulance,
+        99,
+        VEHICLE_TYPE_AMBULANCE,
+        route[0],
+        DIRECTION_EAST,
+        SPEED_FAST,
+        route,
+        2
+    );
+    thread_vehicle_attach_city_map(&ambulance, city_map);
+
+    ASSERT_TRUE(thread_vehicle_place(&ambulance) == 1);
+    ASSERT_TRUE(thread_vehicle_advance_one_step(&ambulance) == 1);
+    thread_vehicle_release(&ambulance);
+
+    simulation_output_destroy();
+    city_map_destroy(city_map);
+
+    stream = fopen(log_path, "r");
+    ASSERT_TRUE(stream != NULL);
+    if (stream)
+    {
+        bytes_read = fread(output, 1, sizeof(output) - 1, stream);
+        output[bytes_read] = '\0';
+        fclose(stream);
+
+        ASSERT_TRUE(strstr(output, "priority requested at intersection") != NULL);
+        ASSERT_TRUE(strstr(output, "priority granted at intersection") != NULL);
+    }
+
+    remove(log_path);
+}
+
 int main(void)
 {
     test_vehicle_moves_without_leaving_duplicate_occupancy();
@@ -196,6 +246,7 @@ int main(void)
     test_one_way_rejects_reverse_direction();
     test_two_way_allows_reverse_direction();
     test_vehicle_cannot_move_outside_map_bounds();
+    test_ambulance_priority_is_written_to_log_file();
 
     if (failures)
     {
