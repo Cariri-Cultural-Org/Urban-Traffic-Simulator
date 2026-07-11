@@ -18,7 +18,8 @@ O `main.c` executa uma demonstração fixa com:
 - duração de cerca de 1 minuto, com 60 ticks de 1 segundo;
 - velocidades de 1, 2 e 4 ticks;
 - alternância dos cruzamentos a cada 3 ticks;
-- terminal dedicado aos frames do mapa com legenda, sem logs de movimento durante a demo;
+- terminal dedicado aos frames do mapa com legenda;
+- eventos concorrentes registrados em `bin/simulation.log`;
 - encerramento com `stop`, `broadcast`, `join` e destruição dos recursos.
 
 O binário gerado é:
@@ -49,6 +50,12 @@ Para rodar os testes:
 make test
 ```
 
+Para gerar novamente o relatório (requer `pdflatex`):
+
+```bash
+make report
+```
+
 Para remover arquivos gerados:
 
 ```bash
@@ -63,9 +70,8 @@ MinGW no Windows.
 ```text
 .
 ├── docs/
-│   ├── conceitos_so.md
-│   ├── explicacao_projeto.md
-│   ├── memoria_virtual.md
+│   ├── ES_SO_TrabalhoPratico1_Equipe_Relatorio.pdf
+│   ├── relatorio.tex
 │   └── tasks-division.md
 ├── src/
 │   ├── main.c
@@ -201,12 +207,16 @@ typedef struct Intersection
 
     int ambulance_present;
     RoadDirection ambulance_direction;
+    int crossing_occupied;
+    RoadDirection crossing_direction;
+    pthread_cond_t crossing_clear_cond;
 } Intersection;
 ```
 
 Quando uma ambulância solicita prioridade, o cruzamento guarda a direção verde
-anterior, libera a direção da ambulância e restaura o ciclo normal quando a
-prioridade é limpa.
+anterior, aguarda uma travessia conflitante terminar, libera a direção da
+ambulância e restaura o ciclo normal quando a prioridade é limpa. A alternância
+normal também é adiada enquanto um veículo ocupa o cruzamento.
 
 O módulo `TrafficLight` permanece no projeto como componente didático, mas a
 simulação integrada usa `Intersection.green_direction`.
@@ -254,9 +264,9 @@ células envolvidas.
 `make test` compila e executa:
 
 - `test_intersection_priority`: prioridade da ambulância, restauração do ciclo
-  do cruzamento e destruição de recursos;
+  do cruzamento, transição segura durante travessia e destruição de recursos;
 - `test_vehicle_invariants`: avanço sem duplicação final, bloqueio atrás de
-  veículo ocupado, mão única, mão dupla e limite do mapa.
+  veículo ocupado, mão única, mão dupla, limite do mapa e log de prioridade;
 - `test_city_map_renderer`: formato básico do frame ASCII e símbolos do mapa.
 
 ## Limitações
@@ -271,7 +281,6 @@ células envolvidas.
 
 ## Documentação Complementar
 
-- [Explicação do projeto](docs/explicacao_projeto.md)
+- [Relatório técnico](docs/ES_SO_TrabalhoPratico1_Equipe_Relatorio.pdf)
+- [Fonte LaTeX do relatório](docs/relatorio.tex)
 - [Divisão de tarefas](docs/tasks-division.md)
-- [Conceitos de Sistemas Operacionais](docs/conceitos_so.md)
-- [Memória virtual](docs/memoria_virtual.md)

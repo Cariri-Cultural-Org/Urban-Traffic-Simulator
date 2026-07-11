@@ -143,7 +143,10 @@ int main(void)
     int started_vehicles = 0;
 
     simulation_output_init();
-    simulation_output_set_log_enabled(0);
+    if (!simulation_output_set_log_file("bin/simulation.log"))
+    {
+        fprintf(stderr, "WARNING: could not open bin/simulation.log; using stderr.\n");
+    }
     simulation_output_log("--- Starting the Urban Traffic Simulator ---\n");
 
     city_map = city_map_create();

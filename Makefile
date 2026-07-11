@@ -38,6 +38,9 @@ TEST_INTERSECTION_SRCS = tests/test_intersection_priority.c src/models/GlobalClo
 TEST_VEHICLE_SRCS = tests/test_vehicle_invariants.c src/models/SimulationOutput.c src/models/CityMapRenderer.c src/models/GlobalClock.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/city_map_utils.c src/models/vehicle_thread.c
 TEST_RENDERER_SRCS = tests/test_city_map_renderer.c src/models/CityMapRenderer.c src/models/GlobalClock.c src/models/Cell.c src/models/Road.c src/models/Intersection.c src/models/CityMap.c src/models/city_map_utils.c
 TEST_TARGETS = $(TEST_INTERSECTION_TARGET) $(TEST_VEHICLE_TARGET) $(TEST_RENDERER_TARGET)
+REPORT_TEX = docs/relatorio.tex
+REPORT_PDF = docs/ES_SO_TrabalhoPratico1_Equipe_Relatorio.pdf
+REPORT_NAME = ES_SO_TrabalhoPratico1_Equipe_Relatorio
 
 # Regra principal (a primeira a rodar se digitar apenas "make")
 all: build_dir $(TARGET)
@@ -64,6 +67,12 @@ test: build_dir $(TEST_TARGETS)
 	$(TEST_VEHICLE_RUN)
 	$(TEST_RENDERER_RUN)
 
+report: $(REPORT_PDF)
+
+$(REPORT_PDF): $(REPORT_TEX)
+	pdflatex -interaction=nonstopmode -halt-on-error -jobname=$(REPORT_NAME) -output-directory=docs $(REPORT_TEX)
+	pdflatex -interaction=nonstopmode -halt-on-error -jobname=$(REPORT_NAME) -output-directory=docs $(REPORT_TEX)
+
 # Compila arquivos .c em .o
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -73,4 +82,4 @@ clean:
 	@$(CLEAN_CMD)
 	@echo "Cleanup completed."
 
-.PHONY: all build_dir clean test
+.PHONY: all build_dir clean test report

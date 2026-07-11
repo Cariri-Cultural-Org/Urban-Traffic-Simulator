@@ -104,6 +104,7 @@ void city_map_broadcast_intersections(CityMap *city_map)
         pthread_mutex_lock(&intersection->mutex);
         pthread_cond_broadcast(&intersection->horizontal_cond);
         pthread_cond_broadcast(&intersection->vertical_cond);
+        pthread_cond_broadcast(&intersection->crossing_clear_cond);
         pthread_mutex_unlock(&intersection->mutex);
     }
 }

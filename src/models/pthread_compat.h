@@ -79,6 +79,11 @@ static inline int pthread_cond_timedwait_ms(
     return SleepConditionVariableCS(condition, mutex, timeout_ms) ? 0 : 1;
 }
 
+static inline void thread_sleep_ms(unsigned int timeout_ms)
+{
+    Sleep(timeout_ms);
+}
+
 static inline int pthread_cond_broadcast(pthread_cond_t *condition)
 {
     WakeAllConditionVariable(condition);
@@ -125,6 +130,7 @@ static inline int pthread_join(pthread_t thread, void **result)
 #else
 #include <pthread.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 static inline int pthread_cond_timedwait_ms(
     pthread_cond_t *condition,
@@ -146,6 +152,11 @@ static inline int pthread_cond_timedwait_ms(
     }
 
     return pthread_cond_timedwait(condition, mutex, &deadline);
+}
+
+static inline void thread_sleep_ms(unsigned int timeout_ms)
+{
+    usleep(timeout_ms * 1000U);
 }
 #endif
 

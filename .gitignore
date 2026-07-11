@@ -15,6 +15,11 @@
 # Arquivos temporários e do VS Code
 .vscode/
 *.log
+*.aux
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
 .agents
 .codex
 .zed
