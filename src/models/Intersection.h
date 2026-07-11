@@ -22,6 +22,10 @@ typedef struct Intersection
     // Suporte à ambulância
     int ambulance_present;
     RoadDirection ambulance_direction;
+
+    int crossing_occupied;
+    RoadDirection crossing_direction;
+    pthread_cond_t crossing_clear_cond;
 } Intersection;
 
 Intersection *intersection_create(int id, int row, int column,
@@ -31,5 +35,6 @@ void intersection_toggle_signal(Intersection *intersection);
 void intersection_wait_green(Intersection *intersection, RoadDirection road_direction);
 int intersection_request_ambulance_priority(Intersection *intersection, RoadDirection road_direction);
 void intersection_clear_ambulance_priority(Intersection *intersection);
+void intersection_finish_crossing(Intersection *intersection, int clear_ambulance_priority);
 
 #endif

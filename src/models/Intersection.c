@@ -30,10 +30,13 @@ Intersection *intersection_create(int id, int row, int column, Road *horizontal_
 
     intersection->ambulance_present = 0; // Ambulância inativa por padrão
     intersection->ambulance_direction = ROAD_HORIZONTAL;
+    intersection->crossing_occupied = 0;
+    intersection->crossing_direction = ROAD_HORIZONTAL;
 
     pthread_mutex_init(&intersection->mutex, NULL);
     pthread_cond_init(&intersection->horizontal_cond, NULL);
     pthread_cond_init(&intersection->vertical_cond, NULL);
+    pthread_cond_init(&intersection->crossing_clear_cond, NULL);
 
     return intersection;
 }
@@ -43,6 +46,7 @@ void intersection_destroy(Intersection *intersection)
     if (!intersection)
         return;
 
+    pthread_cond_destroy(&intersection->crossing_clear_cond);
     pthread_cond_destroy(&intersection->vertical_cond);
     pthread_cond_destroy(&intersection->horizontal_cond);
     pthread_mutex_destroy(&intersection->mutex);
@@ -52,6 +56,12 @@ void intersection_destroy(Intersection *intersection)
 void intersection_toggle_signal(Intersection *intersection)
 {
     pthread_mutex_lock(&intersection->mutex);
+
+    if (intersection->crossing_occupied)
+    {
+        pthread_mutex_unlock(&intersection->mutex);
+        return;
+    }
 
     if (intersection->ambulance_present)
     {
@@ -108,6 +118,23 @@ int intersection_request_ambulance_priority(Intersection *intersection, RoadDire
 
     pthread_mutex_lock(&intersection->mutex);
 
+    while (simulation_running &&
+           intersection->crossing_occupied &&
+           intersection->crossing_direction != road_direction)
+    {
+        pthread_cond_timedwait_ms(
+            &intersection->crossing_clear_cond,
+            &intersection->mutex,
+            100
+        );
+    }
+
+    if (!simulation_running)
+    {
+        pthread_mutex_unlock(&intersection->mutex);
+        return 0;
+    }
+
     if (!intersection->ambulance_present)
     {
         intersection->previous_green_direction = intersection->green_direction;
@@ -155,6 +182,34 @@ void intersection_clear_ambulance_priority(Intersection *intersection)
         pthread_cond_broadcast(&intersection->horizontal_cond);
     else
         pthread_cond_broadcast(&intersection->vertical_cond);
+
+    pthread_mutex_unlock(&intersection->mutex);
+}
+
+void intersection_finish_crossing(Intersection *intersection, int clear_ambulance_priority)
+{
+    RoadDirection restored_direction;
+
+    if (!intersection)
+        return;
+
+    pthread_mutex_lock(&intersection->mutex);
+
+    intersection->crossing_occupied = 0;
+    pthread_cond_broadcast(&intersection->crossing_clear_cond);
+
+    if (clear_ambulance_priority && intersection->ambulance_present)
+    {
+        restored_direction = intersection->previous_green_direction;
+        intersection->ambulance_present = 0;
+        intersection->ambulance_direction = ROAD_HORIZONTAL;
+        intersection->green_direction = restored_direction;
+
+        if (restored_direction == ROAD_HORIZONTAL)
+            pthread_cond_broadcast(&intersection->horizontal_cond);
+        else
+            pthread_cond_broadcast(&intersection->vertical_cond);
+    }
 
     pthread_mutex_unlock(&intersection->mutex);
 }
